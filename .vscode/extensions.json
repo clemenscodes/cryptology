@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "rust-lang.rust-analyzer",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers",
+        "moonrepo.moon-console"
+    ]
+}

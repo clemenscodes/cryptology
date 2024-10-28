@@ -1,0 +1,31 @@
+# https://moonrepo.dev/docs/config/project
+$schema: "https://moonrepo.dev/schemas/project.json"
+id: "workspace"
+project:
+  name: "workspace"
+  description: "cryptology workspace"
+tags:
+  - "cryptology"
+type: "application"
+language: "rust"
+platform: "rust"
+tasks:
+  dev:
+    command: "noop"
+    deps:
+      - "cryptology:dev"
+    local: true
+  build:
+    command: "cargo build --all-targets"
+  release:
+    command: "cargo build --all-targets --release"
+  test:
+    command: "cargo test --all-targets"
+  format:
+    command: "cargo fmt --all-targets"
+  lint:
+    command: "cargo clippy --all-targets -- --deny warnings"
+  taplo:
+    command: "taplo fmt *.toml && taplo fmt crates/**/*.toml"
+    options:
+      cache: false

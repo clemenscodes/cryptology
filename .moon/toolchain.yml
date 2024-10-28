@@ -1,0 +1,6 @@
+# https://moonrepo.dev/docs/config/toolchain
+$schema: 'https://moonrepo.dev/schemas/toolchain.json'
+bun:
+  version: '1.1.29'
+rust:
+  syncToolchainConfig: true

@@ -1,0 +1,17 @@
+# https://moonrepo.dev/docs/config/project
+$schema: "https://moonrepo.dev/schemas/project.json"
+id: "cryptology"
+project:
+  name: "cryptology"
+  description: "cryptology entrypoint"
+tags:
+  - "cryptology"
+type: "application"
+language: "rust"
+platform: "rust"
+workspace:
+  inheritedTasks:
+    exclude: ["dev"]
+tasks:
+  dev:
+    command: "cargo watch -w src -x run"

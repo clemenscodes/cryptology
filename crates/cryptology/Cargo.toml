@@ -1,0 +1,8 @@
+[package]
+name = "cryptology"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+workspace = { version = "0.1", path = "../workspace" }
