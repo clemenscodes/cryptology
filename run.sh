@@ -11,8 +11,5 @@
 # Bei der Ausführung gibt es 2 Alternativen.
 
 # Entweder erfolgt der Aufruf über die Kommandozeile
-docker run --rm -v "$(pwd)":/app/ cryptology cryptology
-
-# oder es wird das ausgeführt, was im Dockerfile unter CMD eingetragen ist
-# docker run --rm -v "$(pwd)":/app/ docker-crypto-gruppe-xx
+docker run --rm -v "$(pwd)":/app/ cryptology cryptology frequency-analysis assets/1/test.txt solution.txt
 

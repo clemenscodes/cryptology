@@ -16,7 +16,7 @@ impl FrequencyAnalyzer {
     let mut total_count = 0;
 
     for c in content.chars() {
-      if c.is_alphabetic() {
+      if c.is_ascii_alphabetic() {
         *frequency.entry(c.to_ascii_uppercase()).or_insert(0) += 1;
         total_count += 1;
       }
@@ -27,7 +27,7 @@ impl FrequencyAnalyzer {
       total_count,
     };
 
-    writeln!(output, "{}", result)?;
+    write!(output, "{result}")?;
     Ok(result)
   }
 }
@@ -75,17 +75,24 @@ impl Display for FrequencyResult {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use std::env;
   use std::fs::File;
   use std::path::PathBuf;
 
   #[test]
   fn test_example_output() -> std::io::Result<()> {
-    let root = std::env::current_dir().unwrap();
+    let (root, relative_root) =
+      if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+        (PathBuf::from(manifest_dir), "src/frequency_analysis/assets")
+      } else {
+        (
+          env::current_dir().expect("Failed to get current directory"),
+          "crates/cli/src/frequency_analysis/assets",
+        )
+      };
 
-    let input_path_str = "crates/cli/src/frequency_analysis/assets/input.txt";
-    let input_path = PathBuf::from(&root).join(input_path_str);
-    let output_path_str = "crates/cli/src/frequency_analysis/assets/output.txt";
-    let output_path = PathBuf::from(&root).join(output_path_str);
+    let input_path = root.join(relative_root).join("input.txt");
+    let output_path = root.join(relative_root).join("output.txt");
 
     let mut input_file = File::open(input_path)?;
     let mut output_buffer = Vec::new();

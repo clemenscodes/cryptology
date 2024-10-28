@@ -122,7 +122,7 @@
             });
 
           cli = craneLib.buildPackage (individualCrateArgs
-            // {
+            // rec {
               pname = "cli";
               cargoExtraArgs = "-p ${pname}";
               src = fileSetForCrate [

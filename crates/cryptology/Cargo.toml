@@ -5,5 +5,5 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-workspace = { version = "0.1", path = "../workspace" }
 cli.workspace = true
+workspace = { version = "0.1", path = "../workspace" }
