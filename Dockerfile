@@ -57,6 +57,7 @@ COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
 COPY rust-toolchain.toml rust-toolchain.toml
 COPY crates/cryptology/Cargo.toml crates/cryptology/Cargo.toml
+COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
 COPY crates/workspace crates/workspace
 COPY --from=openssl /musl /musl
 
@@ -65,11 +66,14 @@ ENV OPENSSL_STATIC=true
 ENV OPENSSL_DIR=/musl
 
 RUN mkdir -p \
+  crates/cli/src \
   crates/cryptology/src && \
+  touch crates/cli/src/lib.rs && \
   echo "fn main() {println!(\"if you see this, the build broke\")}" > crates/cryptology/src/main.rs && \
   rustup target add x86_64-unknown-linux-musl && \
   cargo build --release --target=x86_64-unknown-linux-musl && \
-  rm -rf target/x86_64-unknown-linux-musl/release/deps/${APP}*
+  rm -rf target/x86_64-unknown-linux-musl/release/deps/${APP}* && \
+  rm -rf target/x86_64-unknown-linux-musl/release/deps/libcli*
 
 COPY crates crates
 

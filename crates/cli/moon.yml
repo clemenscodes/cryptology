@@ -1,0 +1,17 @@
+# https://moonrepo.dev/docs/config/project
+$schema: "https://moonrepo.dev/schemas/project.json"
+id: "cli"
+project:
+  name: "cli"
+  description: "cli library"
+tags:
+  - "cli"
+type: "application"
+language: "rust"
+platform: "rust"
+workspace:
+  inheritedTasks:
+    exclude: ["dev"]
+tasks:
+  dev:
+    command: "cargo watch -w src -x run"

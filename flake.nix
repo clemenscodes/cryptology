@@ -114,12 +114,25 @@
             // {
               cargoExtraArgs = "-p ${pname}";
               src = fileSetForCrate [
-                ./crates/cryptology
+                ./crates/cryptology/src
+                ./crates/cryptology/Cargo.toml
+                ./crates/cli/src
+                ./crates/cli/Cargo.toml
+              ];
+            });
+
+          cli = craneLib.buildPackage (individualCrateArgs
+            // {
+              pname = "cli";
+              cargoExtraArgs = "-p ${pname}";
+              src = fileSetForCrate [
+                ./crates/cli/src
+                ./crates/cli/Cargo.toml
               ];
             });
         in {
           checks = {
-            inherit cryptology;
+            inherit cryptology cli;
 
             clippy = craneLib.cargoClippy (args
               // {

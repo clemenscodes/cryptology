@@ -11,5 +11,7 @@ license = "MIT"
 name = "cryptology"
 
 [workspace.dependencies]
-cryptology = { path = "./crates/cryptology" }
 workspace = { path = "./crates/workspace" }
+cryptology = { path = "./crates/cryptology" }
+cli = { path = "./crates/cli" }
+clap = { version = "4.5.20", features = ["derive"] }
