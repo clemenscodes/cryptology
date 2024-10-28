@@ -14,4 +14,4 @@ workspace:
     exclude: ["dev"]
 tasks:
   dev:
-    command: "cargo watch -w src -x run"
+    command: "cargo watch -w src -x build"

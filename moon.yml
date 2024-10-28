@@ -3,9 +3,7 @@ $schema: "https://moonrepo.dev/schemas/project.json"
 id: "workspace"
 project:
   name: "workspace"
-  description: "cryptology workspace"
-tags:
-  - "cryptology"
+  description: "workspace"
 type: "application"
 language: "rust"
 platform: "rust"
@@ -13,7 +11,7 @@ tasks:
   dev:
     command: "noop"
     deps:
-      - "cryptology:dev"
+      - "cli:dev"
     local: true
   build:
     command: "cargo build --all-targets"

@@ -4,8 +4,6 @@ id: "cryptology"
 project:
   name: "cryptology"
   description: "cryptology entrypoint"
-tags:
-  - "cryptology"
 type: "application"
 language: "rust"
 platform: "rust"
