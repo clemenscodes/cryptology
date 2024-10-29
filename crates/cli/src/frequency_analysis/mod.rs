@@ -81,7 +81,7 @@ mod tests {
 
   #[test]
   fn test_example_output() -> Result<()> {
-    let (root, relative_root) = match env::var("CARGO_MANIFEST_DIR") {
+    let (root, relative_path) = match env::var("CARGO_MANIFEST_DIR") {
       Ok(manifest_dir) => {
         (PathBuf::from(manifest_dir), "src/frequency_analysis/assets")
       }
@@ -91,8 +91,9 @@ mod tests {
       ),
     };
 
-    let input_path = root.join(relative_root).join("input.txt");
-    let output_path = root.join(relative_root).join("output.txt");
+    let relative_root = root.join(relative_path);
+    let input_path = relative_root.join("input.txt");
+    let output_path = relative_root.join("output.txt");
 
     let mut input_file = File::open(&input_path)?;
     let mut output_buffer = Vec::new();
