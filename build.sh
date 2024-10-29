@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 
-# In Der Datei soll die Umgebung gebaut werden
+CONTAINER=cryptology
 
-# Anmerkung: Der Container sollte einen eindeutigen Namen haben,
-# den Sie dann wieder im anderen Skript verwenden können.
+echo "Building container $CONTAINER"
 
-docker build . -t cryptology
-
+docker build . -t $CONTAINER

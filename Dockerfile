@@ -12,15 +12,15 @@ WORKDIR /app
 COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
 COPY rust-toolchain.docker.toml rust-toolchain.toml
-COPY crates/cryptology/Cargo.toml crates/cryptology/Cargo.toml
-COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
 COPY crates/workspace crates/workspace
+COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
+COPY crates/${APP}/Cargo.toml crates/${APP}/Cargo.toml
 
 RUN mkdir -p \
   crates/cli/src \
-  crates/cryptology/src && \
+  crates/${APP}/src && \
   touch crates/cli/src/lib.rs && \
-  echo "fn main() {println!(\"if you see this, the build broke\")}" > crates/cryptology/src/main.rs && \
+  echo "fn main() {println!(\"if you see this, the build broke\")}" > crates/${APP}/src/main.rs && \
   cargo build --release && \
   rm -rf target/${CARGO_BUILD_TARGET}/release/deps/${APP}* && \
   rm -rf target/${CARGO_BUILD_TARGET}/release/deps/libcli*
@@ -44,4 +44,4 @@ RUN addgroup -g 1000 ${APP} && \
 
 USER ${APP}
 
-CMD ["cryptology"]
+CMD ["/bin/sh", "-c"]
