@@ -6,6 +6,7 @@ members = ["crates/*", "crates/workspace"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+authors = ["Clemens Horn <me@clemenshorn.com>"]
 
 [workspace.metadata.crane]
 name = "cryptology"
@@ -14,4 +15,4 @@ name = "cryptology"
 workspace = { path = "./crates/workspace" }
 cryptology = { path = "./crates/cryptology" }
 cli = { path = "./crates/cli" }
-clap = { version = "4.5.20", features = ["derive"] }
+clap = { version = "4.5.20", features = ["derive", "help"] }

@@ -2,6 +2,6 @@
 
 CONTAINER=cryptology
 
-echo "Building container $CONTAINER"
+echo "Building docker image $CONTAINER"
 
 docker build . -t $CONTAINER

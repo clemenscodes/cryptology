@@ -1,9 +1,11 @@
 # https://moonrepo.dev/docs/config/project
 $schema: "https://moonrepo.dev/schemas/project.json"
-id: "cryptology"
+id: "binary"
 project:
-  name: "cryptology"
-  description: "cryptology entrypoint"
+  name: "binary"
+  description: "cryptology binary"
+tags:
+  - "binary"
 type: "application"
 language: "rust"
 platform: "rust"
@@ -12,4 +14,6 @@ workspace:
     exclude: ["dev"]
 tasks:
   dev:
-    command: "cargo watch -w src -x run"
+    command: "cargo watch -w src -x build"
+  exec:
+    command: "cargo run"

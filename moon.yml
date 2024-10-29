@@ -1,9 +1,9 @@
 # https://moonrepo.dev/docs/config/project
 $schema: "https://moonrepo.dev/schemas/project.json"
-id: "workspace"
+id: "root"
 project:
-  name: "workspace"
-  description: "workspace"
+  name: "root"
+  description: "root of workspace"
 type: "application"
 language: "rust"
 platform: "rust"
@@ -12,6 +12,7 @@ tasks:
     command: "noop"
     deps:
       - "cli:dev"
+      - "binary:dev"
     local: true
   build:
     command: "cargo build --all-targets"
