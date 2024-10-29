@@ -1,9 +1,8 @@
 pub mod frequency_analysis;
 
 use clap::{Parser, Subcommand};
-use std::error::Error;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, Read, Result, Write};
 use std::path::PathBuf;
 
 use frequency_analysis::FrequencyAnalyzer;
@@ -36,10 +35,9 @@ pub struct Cryptology {
 }
 
 impl Cryptology {
-  pub fn execute() -> Result<(), Box<dyn Error>> {
+  pub fn execute() -> Result<()> {
     let cli = Self::parse();
-    cli.command.execute()?;
-    Ok(())
+    cli.command.execute()
   }
 }
 
@@ -90,24 +88,18 @@ pub enum Command {
 }
 
 impl Command {
-  pub fn execute(&self) -> Result<(), Box<dyn Error>> {
+  pub fn execute(&self) -> Result<()> {
     match self {
       Command::FrequencyAnalysis { default_args } => {
         let mut input_data = self.open_input(&default_args.input)?;
         let mut output_data = self.create_output(&default_args.output)?;
 
         FrequencyAnalyzer::analyze(&mut input_data, &mut output_data)
-          .expect("Frequency analysis failed");
-
-        Ok(())
       }
     }
   }
 
-  fn open_input(
-    &self,
-    input: &Option<PathBuf>,
-  ) -> Result<Box<dyn Read>, Box<dyn Error>> {
+  fn open_input(&self, input: &Option<PathBuf>) -> Result<Box<dyn Read>> {
     match input {
       Some(path) => Ok(Box::new(
         File::open(path).expect("Failed to open input file"),
@@ -116,10 +108,7 @@ impl Command {
     }
   }
 
-  fn create_output(
-    &self,
-    output: &Option<PathBuf>,
-  ) -> Result<Box<dyn Write>, Box<dyn Error>> {
+  fn create_output(&self, output: &Option<PathBuf>) -> Result<Box<dyn Write>> {
     match output {
       Some(path) => Ok(Box::new(
         File::create(path).expect("Failed to create output file"),

@@ -1,7 +1,5 @@
-use std::error::Error;
-
 use cli::Cryptology;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> std::io::Result<()> {
   Cryptology::execute()
 }

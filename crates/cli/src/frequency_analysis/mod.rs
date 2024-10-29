@@ -8,7 +8,7 @@ impl FrequencyAnalyzer {
   pub fn analyze<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
-  ) -> Result<FrequencyResult> {
+  ) -> Result<()> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
@@ -28,7 +28,7 @@ impl FrequencyAnalyzer {
     };
 
     write!(output, "{result}")?;
-    Ok(result)
+    Ok(())
   }
 }
 
@@ -80,29 +80,30 @@ mod tests {
   use std::path::PathBuf;
 
   #[test]
-  fn test_example_output() -> std::io::Result<()> {
-    let (root, relative_root) =
-      if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
+  fn test_example_output() -> Result<()> {
+    let (root, relative_root) = match env::var("CARGO_MANIFEST_DIR") {
+      Ok(manifest_dir) => {
         (PathBuf::from(manifest_dir), "src/frequency_analysis/assets")
-      } else {
-        (
-          env::current_dir().expect("Failed to get current directory"),
-          "crates/cli/src/frequency_analysis/assets",
-        )
-      };
+      }
+      Err(_) => (
+        env::current_dir().expect("Failed to get current directory"),
+        "crates/cli/src/frequency_analysis/assets",
+      ),
+    };
 
     let input_path = root.join(relative_root).join("input.txt");
     let output_path = root.join(relative_root).join("output.txt");
 
-    let mut input_file = File::open(input_path)?;
+    let mut input_file = File::open(&input_path)?;
     let mut output_buffer = Vec::new();
 
     FrequencyAnalyzer::analyze(&mut input_file, &mut output_buffer)?;
 
     let mut expected_output = String::new();
-    File::open(output_path)?.read_to_string(&mut expected_output)?;
+    File::open(&output_path)?.read_to_string(&mut expected_output)?;
 
-    let output_string = String::from_utf8(output_buffer).unwrap();
+    let output_string = String::from_utf8(output_buffer)
+      .expect("Failed to convert output buffer to UTF-8 string");
 
     assert_eq!(output_string, expected_output);
     Ok(())
