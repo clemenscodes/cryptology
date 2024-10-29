@@ -1,86 +1,48 @@
-FROM rust:1.81.0-slim-bullseye AS base
+FROM rust:1.82.0-alpine3.20 AS build
 
 ENV APP=cryptology
-ENV DEBIAN_FRONTEND=noninteractive
-ENV SHELL=/bin/bash
-ENV PATH="/root/.proto/bin:$PATH"
+ENV TARGET=x86_64-unknown-linux-musl
 
-RUN apt-get update && \
-  apt-get install -y --no-install-recommends \
-  git=1:2.30.2-1* \
-  gzip=1.10-4* \
-  unzip=6.0-26* \
-  xz-utils=5.2.5-2.1* \
-  curl=7.74.0-1.3* \
-  pkg-config=0.29.2-1* \
-  openssl=1.1.1* \
-  libssl-dev=1.1.1* \
-  musl-tools=1.2.2-1* \
-  make=4.3-4.1* \
-  && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/*
-
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-
-RUN curl -fsSL https://moonrepo.dev/install/proto.sh | bash -s -- 0.41.3 --yes && \
-  proto plugin add moon "https://raw.githubusercontent.com/moonrepo/moon/master/proto-plugin.toml" && \
-  proto install moon && \
-  proto install bun
-
-FROM base AS openssl
-
-WORKDIR /openssl
-
-RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
-  ln -s /usr/include/asm-generic /usr/include/x86_64-linux-musl/asm-generic && \
-  ln -s /usr/include/linux /usr/include/x86_64-linux-musl/linux && \
-  mkdir /musl && \
-  curl -LO https://github.com/openssl/openssl/archive/OpenSSL_1_1_1f.tar.gz && \
-  tar zxvf OpenSSL_1_1_1f.tar.gz
-
-WORKDIR /openssl/openssl-OpenSSL_1_1_1f/
-
-RUN CC="musl-gcc -fPIE -pie" ./Configure no-shared no-async --prefix=/musl --openssldir=/musl/ssl linux-x86_64 && \
-  make depend && \
-  make -j"$(nproc)" && \
-  make install
+RUN apk update && \
+  apk add --no-cache \
+  gcc \
+  libgcc \
+  git=2.45.2-r0 \
+  gzip=1.13-r0 \
+  unzip=6.0-r14 \
+  xz=5.6.2-r0 \
+  curl=8.10.1-r0 \
+  pkgconf=2.2.0-r0 \
+  openssl=3.3.2-r1 \
+  openssl-dev=3.3.2-r1 \
+  musl-dev=1.2.5-r0 \
+  make=4.4.1-r2
 
 WORKDIR /app
 
-FROM base AS build
-
-WORKDIR /app
-
-COPY .moon .moon
 COPY Cargo.toml Cargo.toml
 COPY Cargo.lock Cargo.lock
-COPY rust-toolchain.toml rust-toolchain.toml
+COPY rust-toolchain.docker.toml rust-toolchain.toml
 COPY crates/cryptology/Cargo.toml crates/cryptology/Cargo.toml
 COPY crates/cli/Cargo.toml crates/cli/Cargo.toml
 COPY crates/workspace crates/workspace
-COPY --from=openssl /musl /musl
-
-ENV PKG_CONFIG_ALLOW_CROSS=1
-ENV OPENSSL_STATIC=true
-ENV OPENSSL_DIR=/musl
 
 RUN mkdir -p \
   crates/cli/src \
   crates/cryptology/src && \
   touch crates/cli/src/lib.rs && \
   echo "fn main() {println!(\"if you see this, the build broke\")}" > crates/cryptology/src/main.rs && \
-  rustup target add x86_64-unknown-linux-musl && \
-  cargo build --release --target=x86_64-unknown-linux-musl && \
-  rm -rf target/x86_64-unknown-linux-musl/release/deps/${APP}* && \
-  rm -rf target/x86_64-unknown-linux-musl/release/deps/libcli*
+  rustup target add ${TARGET} && \
+  cargo build --release --target ${TARGET} && \
+  rm -rf target/${TARGET}/release/deps/${APP}* && \
+  rm -rf target/${TARGET}/release/deps/libcli*
 
 COPY crates crates
 
-RUN cargo build -p ${APP} --release --target=x86_64-unknown-linux-musl && \
-  mv target/x86_64-unknown-linux-musl/release/${APP} ${APP}
+RUN cargo build -p ${APP} --release --target ${TARGET} && \
+  mv target/${TARGET}/release/${APP} ${APP}
 
-FROM alpine:3.20.2 AS start
+FROM rust:1.82.0-alpine3.20 AS start
 
 ENV APP=cryptology
 
