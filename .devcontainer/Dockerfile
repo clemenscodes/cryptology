@@ -1,4 +1,4 @@
-FROM rust:1.80.1-slim-bullseye
+FROM rust:1.82.0-slim-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV SHELL=/bin/bash

@@ -1,22 +1,11 @@
 FROM rust:1.82.0-alpine3.20 AS build
 
 ENV APP=cryptology
-ENV TARGET=x86_64-unknown-linux-musl
+ENV CARGO_BUILD_TARGET=x86_64-unknown-linux-musl
 
 RUN apk update && \
   apk add --no-cache \
-  gcc \
-  libgcc \
-  git=2.45.2-r0 \
-  gzip=1.13-r0 \
-  unzip=6.0-r14 \
-  xz=5.6.2-r0 \
-  curl=8.10.1-r0 \
-  pkgconf=2.2.0-r0 \
-  openssl=3.3.2-r1 \
-  openssl-dev=3.3.2-r1 \
-  musl-dev=1.2.5-r0 \
-  make=4.4.1-r2
+  musl-dev=1.2.5-r0
 
 WORKDIR /app
 
@@ -32,15 +21,14 @@ RUN mkdir -p \
   crates/cryptology/src && \
   touch crates/cli/src/lib.rs && \
   echo "fn main() {println!(\"if you see this, the build broke\")}" > crates/cryptology/src/main.rs && \
-  rustup target add ${TARGET} && \
-  cargo build --release --target ${TARGET} && \
-  rm -rf target/${TARGET}/release/deps/${APP}* && \
-  rm -rf target/${TARGET}/release/deps/libcli*
+  cargo build --release && \
+  rm -rf target/${CARGO_BUILD_TARGET}/release/deps/${APP}* && \
+  rm -rf target/${CARGO_BUILD_TARGET}/release/deps/libcli*
 
 COPY crates crates
 
-RUN cargo build -p ${APP} --release --target ${TARGET} && \
-  mv target/${TARGET}/release/${APP} ${APP}
+RUN cargo build -p ${APP} --release && \
+  mv target/${CARGO_BUILD_TARGET}/release/${APP} ${APP}
 
 FROM rust:1.82.0-alpine3.20 AS start
 
