@@ -1,6 +1,8 @@
 pub mod frequency_analysis;
+pub mod monoalphabetic_substitution;
 
 use clap::{Parser, Subcommand};
+use monoalphabetic_substitution::MonoalphabeticSubstition;
 use std::fs::File;
 use std::io::{self, Read, Result, Write};
 use std::path::PathBuf;
@@ -79,9 +81,22 @@ pub enum Command {
     name = "frequency-analysis",
     visible_aliases = ["freq", "fa"],
     version,
-    about,
   )]
   FrequencyAnalysis {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+  },
+
+  /// Decrypt monoalphabetic substitution ciphers by frequency analysis.
+  ///
+  /// This command sorts the ciphertext letters by frequency and provides
+  /// hints based on common letter frequencies for decryption.
+  #[command(
+    name = "monoalphabetic-substition",
+    visible_aliases = ["monosub", "ms"],
+    version,
+  )]
+  MonoalphabeticSubstitution {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
   },
@@ -91,12 +106,23 @@ impl Command {
   pub fn execute(&self) -> Result<()> {
     match self {
       Command::FrequencyAnalysis { default_args } => {
-        let mut input_data = self.open_input(&default_args.input)?;
-        let mut output_data = self.create_output(&default_args.output)?;
-
-        FrequencyAnalyzer::analyze(&mut input_data, &mut output_data)
+        let (mut input, mut output) = self.get_files(default_args)?;
+        FrequencyAnalyzer::analyze(&mut input, &mut output)
+      }
+      Command::MonoalphabeticSubstitution { default_args } => {
+        let (mut input, mut output) = self.get_files(default_args)?;
+        MonoalphabeticSubstition::analyze(&mut input, &mut output)
       }
     }
+  }
+
+  fn get_files(
+    &self,
+    default_args: &CryptologyDefaultArgs,
+  ) -> Result<(Box<dyn Read>, Box<dyn Write>)> {
+    let input_data = self.open_input(&default_args.input)?;
+    let output_data = self.create_output(&default_args.output)?;
+    Ok((input_data, output_data))
   }
 
   fn open_input(&self, input: &Option<PathBuf>) -> Result<Box<dyn Read>> {
