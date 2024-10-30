@@ -1,12 +1,22 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 use std::io::{Read, Result, Write};
 
-pub type SubstitionMapType = HashMap<char, char>;
+pub type SubstitionMapType = BTreeMap<char, char>;
 
 pub struct SubstitutionMap(pub SubstitionMapType);
 
-impl SubstitutionMap {}
+impl SubstitutionMap {
+  pub fn new() -> Self {
+    Self(SubstitionMapType::new())
+  }
+}
+
+impl Default for SubstitutionMap {
+  fn default() -> Self {
+    Self::new()
+  }
+}
 
 impl SubstitutionMap {
   pub fn apply<R: Read, W: Write>(
@@ -22,7 +32,7 @@ impl SubstitutionMap {
       .map(|c| *self.0.get(&c).unwrap_or(&c))
       .collect();
 
-    output.write_all(transformed.as_bytes())
+    write!(output, "{transformed}")
   }
 }
 
@@ -35,7 +45,7 @@ impl Debug for SubstitutionMap {
 impl Display for SubstitutionMap {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     for (source, target) in &self.0 {
-      writeln!(f, "  {} -> {}", source, target)?;
+      writeln!(f, "{source} -> {target}")?;
     }
     Ok(())
   }
@@ -69,7 +79,7 @@ mod tests {
     let mut output = Vec::new();
     let mut expected_output = String::new();
 
-    let mut substitution_map = SubstitutionMap(HashMap::new());
+    let mut substitution_map = SubstitutionMap(SubstitionMapType::new());
 
     substitution_map.0.insert('Q', 'E');
     substitution_map.0.insert('G', 'T');
@@ -107,5 +117,20 @@ mod tests {
 
     assert_eq!(result, expected_output);
     Ok(())
+  }
+
+  #[test]
+  fn test_substitution_map_display_alphabetical_order() {
+    let mut map = SubstitionMapType::new();
+    map.insert('b', 'y');
+    map.insert('a', 'x');
+    map.insert('c', 'z');
+
+    let substitution_map = SubstitutionMap(map);
+
+    let output = format!("{substitution_map}");
+    let expected_output = "a -> x\nb -> y\nc -> z\n";
+
+    assert_eq!(output, expected_output);
   }
 }

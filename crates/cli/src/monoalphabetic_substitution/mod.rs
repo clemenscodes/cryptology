@@ -1,6 +1,5 @@
 pub mod substitution_map;
 
-use std::collections::HashMap;
 use std::io::Result;
 use std::{io::Read, io::Write};
 
@@ -18,14 +17,13 @@ impl MonoalphabeticSubstition {
   ) -> Result<()> {
     let mut content = String::new();
     let mut buf = Vec::new();
-
     input.read_to_string(&mut content)?;
 
     let freq = FrequencyAnalyzer::analyze(&mut content.as_bytes(), &mut buf)?;
 
     let mut freqs: Vec<_> = freq.frequency.iter().collect();
     let mut english_frequencies: Vec<_> = ENGLISH.iter().collect();
-    let mut substitution_map: SubstitutionMap = SubstitutionMap(HashMap::new());
+    let mut substitution_map = SubstitutionMap::default();
 
     freqs.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
     english_frequencies.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
@@ -35,6 +33,8 @@ impl MonoalphabeticSubstition {
     {
       substitution_map.0.insert(**analyzed_char, **english_char);
     }
+
+    println!("{substitution_map}");
 
     substitution_map.apply(&mut content.as_bytes(), output)?;
     Ok(())
