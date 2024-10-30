@@ -107,7 +107,8 @@ impl Command {
     match self {
       Command::FrequencyAnalysis { default_args } => {
         let (mut input, mut output) = self.get_files(default_args)?;
-        FrequencyAnalyzer::analyze(&mut input, &mut output)
+        FrequencyAnalyzer::analyze(&mut input, &mut output)?;
+        Ok(())
       }
       Command::MonoalphabeticSubstitution { default_args } => {
         let (mut input, mut output) = self.get_files(default_args)?;

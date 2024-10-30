@@ -2,8 +2,8 @@ use std::{collections::HashMap, sync::LazyLock};
 
 use super::Frequency;
 
-pub static ENGLISH_FREQUENCY: LazyLock<Frequency> = LazyLock::new(|| {
-  let frequencies = HashMap::from([
+pub static ENGLISH: LazyLock<Frequency> = LazyLock::new(|| {
+  HashMap::from([
     ('E', 12359),
     ('T', 8952),
     ('A', 8050),
@@ -30,8 +30,7 @@ pub static ENGLISH_FREQUENCY: LazyLock<Frequency> = LazyLock::new(|| {
     ('J', 127),
     ('Q', 99),
     ('Z', 88),
-  ]);
-  Frequency::new(frequencies)
+  ])
 });
 
 #[cfg(test)]
@@ -40,24 +39,23 @@ mod tests {
 
   #[test]
   fn test_english_frequency_contains_all_characters() {
-    let frequency = &ENGLISH_FREQUENCY.frequencies;
+    let frequency = &ENGLISH;
 
     assert_eq!(frequency.len(), 26);
 
     for ch in 'A'..='Z' {
-      assert!(frequency.contains_key(&ch), "Missing character {}", ch);
+      assert!(frequency.contains_key(&ch), "Missing character {ch}");
     }
   }
 
   #[test]
   fn test_english_frequency_does_not_contain_extra_characters() {
-    let frequency = &ENGLISH_FREQUENCY.frequencies;
+    let frequency = &ENGLISH;
 
     for ch in 'a'..='z' {
       assert!(
         !frequency.contains_key(&ch),
-        "Unexpected lowercase character {}",
-        ch
+        "Unexpected lowercase character {ch}"
       );
     }
     assert!(!frequency.contains_key(&' '), "Unexpected space character");

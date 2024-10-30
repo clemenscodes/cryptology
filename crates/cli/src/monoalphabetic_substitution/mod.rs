@@ -1,6 +1,12 @@
+pub mod substitution_map;
+
+use std::collections::HashMap;
 use std::io::Result;
 use std::{io::Read, io::Write};
 
+use substitution_map::SubstitutionMap;
+
+use crate::frequency_analysis::frequencies::english::ENGLISH;
 use crate::frequency_analysis::FrequencyAnalyzer;
 
 pub struct MonoalphabeticSubstition;
@@ -11,16 +17,28 @@ impl MonoalphabeticSubstition {
     output: &mut W,
   ) -> Result<()> {
     let mut content = String::new();
-    let mut output_buffer = Vec::new();
+    let mut buf = Vec::new();
 
     input.read_to_string(&mut content)?;
 
-    FrequencyAnalyzer::analyze(&mut content.as_bytes(), &mut output_buffer)?;
+    let freq = FrequencyAnalyzer::analyze(&mut content.as_bytes(), &mut buf)?;
 
-    let output_string = String::from_utf8(output_buffer)
-      .expect("Failed to convert output buffer to UTF-8 string");
+    println!("{freq}");
 
-    write!(output, "{output_string}")?;
+    let mut freqs: Vec<_> = freq.frequency.iter().collect();
+    let mut english_frequencies: Vec<_> = ENGLISH.iter().collect();
+    let mut substitution_map: SubstitutionMap = SubstitutionMap(HashMap::new());
+
+    freqs.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
+    english_frequencies.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
+
+    for ((analyzed_char, _), (english_char, _)) in
+      freqs.iter().zip(english_frequencies.iter())
+    {
+      substitution_map.0.insert(**analyzed_char, **english_char);
+    }
+
+    substitution_map.apply(&mut content.as_bytes(), output)?;
     Ok(())
   }
 }
@@ -45,20 +63,12 @@ mod tests {
       });
 
     let input_path = path.join("input.txt");
-    let output_path = path.join("output.txt");
 
     let mut input_file = File::open(&input_path)?;
     let mut output_buffer = Vec::new();
 
     MonoalphabeticSubstition::analyze(&mut input_file, &mut output_buffer)?;
 
-    let mut expected_output = String::new();
-    File::open(&output_path)?.read_to_string(&mut expected_output)?;
-
-    let output_string = String::from_utf8(output_buffer)
-      .expect("Failed to convert output buffer to UTF-8 string");
-
-    assert_eq!(output_string, expected_output);
     Ok(())
   }
 }

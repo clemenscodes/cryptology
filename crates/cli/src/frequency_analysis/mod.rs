@@ -1,4 +1,4 @@
-mod frequencies;
+pub mod frequencies;
 
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
@@ -12,21 +12,19 @@ impl FrequencyAnalyzer {
   pub fn analyze<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
-  ) -> Result<()> {
+  ) -> Result<FrequencyResult> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
-    let mut frequencies = HashMap::new();
+    let mut frequency: Frequency = HashMap::new();
     let mut total_count = 0;
 
     for c in content.chars() {
       if c.is_ascii_alphabetic() {
-        *frequencies.entry(c.to_ascii_uppercase()).or_insert(0) += 1;
+        *frequency.entry(c.to_ascii_uppercase()).or_insert(0) += 1;
         total_count += 1;
       }
     }
-
-    let frequency = Frequency::new(frequencies);
 
     let result = FrequencyResult {
       frequency,
@@ -34,14 +32,14 @@ impl FrequencyAnalyzer {
     };
 
     write!(output, "{result}")?;
-    Ok(())
+    Ok(result)
   }
 }
 
 #[derive(PartialEq, Eq)]
 pub struct FrequencyResult {
-  frequency: Frequency,
-  total_count: usize,
+  pub frequency: Frequency,
+  pub total_count: usize,
 }
 
 impl FrequencyResult {
@@ -55,11 +53,7 @@ impl Display for FrequencyResult {
     writeln!(f, "| Letter | Occurrences | Percentage |")?;
     writeln!(f, "| ------ | ----------- | ---------- |")?;
 
-    let mut entries = self
-      .frequency
-      .frequencies
-      .iter()
-      .collect::<Vec<(&char, &usize)>>();
+    let mut entries = self.frequency.iter().collect::<Vec<(&char, &usize)>>();
 
     entries.sort_by(|a, b| b.1.cmp(a.1));
 
