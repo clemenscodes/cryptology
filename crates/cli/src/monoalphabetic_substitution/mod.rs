@@ -34,13 +34,15 @@ mod tests {
 
   #[test]
   fn test_monoalphabetic_substitution_analysis_output() -> Result<()> {
-    let path = match env::var("CARGO_MANIFEST_DIR") {
-      Ok(manifest_dir) => PathBuf::from(manifest_dir)
-        .join("src/monoalphabetic_substitution/assets"),
-      Err(_) => env::current_dir()
-        .expect("Failed to get current directory")
-        .join("crates/cli/src/monoalphabetic_substitution/assets"),
-    };
+    let assets = "src/monoalphabetic_substitution/assets";
+    let path = env::var("CARGO_MANIFEST_DIR")
+      .map(|dir| PathBuf::from(dir).join(assets))
+      .unwrap_or_else(|_| {
+        env::current_dir()
+          .expect("Failed to get current directory")
+          .join("crates/cli")
+          .join(assets)
+      });
 
     let input_path = path.join("input.txt");
     let output_path = path.join("output.txt");

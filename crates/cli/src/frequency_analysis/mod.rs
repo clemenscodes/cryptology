@@ -81,19 +81,18 @@ mod tests {
 
   #[test]
   fn test_example_output() -> Result<()> {
-    let (root, relative_path) = match env::var("CARGO_MANIFEST_DIR") {
-      Ok(manifest_dir) => {
-        (PathBuf::from(manifest_dir), "src/frequency_analysis/assets")
-      }
-      Err(_) => (
-        env::current_dir().expect("Failed to get current directory"),
-        "crates/cli/src/frequency_analysis/assets",
-      ),
-    };
+    let assets = "src/frequency_analysis/assets";
+    let path = env::var("CARGO_MANIFEST_DIR")
+      .map(|dir| PathBuf::from(dir).join(assets))
+      .unwrap_or_else(|_| {
+        env::current_dir()
+          .expect("Failed to get current directory")
+          .join("crates/cli")
+          .join(assets)
+      });
 
-    let relative_root = root.join(relative_path);
-    let input_path = relative_root.join("input.txt");
-    let output_path = relative_root.join("output.txt");
+    let input_path = path.join("input.txt");
+    let output_path = path.join("output.txt");
 
     let mut input_file = File::open(&input_path)?;
     let mut output_buffer = Vec::new();
