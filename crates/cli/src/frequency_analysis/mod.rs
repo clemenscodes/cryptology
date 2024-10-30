@@ -46,7 +46,7 @@ impl FrequencyResult {
 
 impl Debug for FrequencyResult {
   fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-    write!(f, "FrequencyResult: {:?}", self.frequency)
+    write!(f, "{:?}", self.frequency)
   }
 }
 
