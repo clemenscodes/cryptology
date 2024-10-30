@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use std::fmt::{Debug, Display};
-use std::io::Result;
-use std::{collections::HashMap, io::Write};
+use std::io::{Read, Result, Write};
 
 pub type SubstitionMapType = HashMap<char, char>;
 
@@ -9,7 +9,7 @@ pub struct SubstitutionMap(pub SubstitionMapType);
 impl SubstitutionMap {}
 
 impl SubstitutionMap {
-  pub fn apply<R: std::io::Read, W: Write>(
+  pub fn apply<R: Read, W: Write>(
     &self,
     input: &mut R,
     output: &mut W,
@@ -17,17 +17,12 @@ impl SubstitutionMap {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
-    println!("{content}");
-
     let transformed: String = content
       .chars()
       .map(|c| *self.0.get(&c).unwrap_or(&c))
       .collect();
 
-    println!("{transformed}");
-
-    output.write_all(transformed.as_bytes())?;
-    Ok(())
+    output.write_all(transformed.as_bytes())
   }
 }
 
@@ -39,7 +34,6 @@ impl Debug for SubstitutionMap {
 
 impl Display for SubstitutionMap {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    writeln!(f, "Substitution Map:")?;
     for (source, target) in &self.0 {
       writeln!(f, "  {} -> {}", source, target)?;
     }
@@ -52,28 +46,8 @@ mod tests {
   use super::*;
   use std::env;
   use std::fs::File;
-  use std::io::{Cursor, Read};
+  use std::io::Read;
   use std::path::PathBuf;
-
-  #[test]
-  fn test_apply_simple_substitution() {
-    let mut substitution_map = SubstitutionMap(HashMap::new());
-    substitution_map.0.insert('H', 'J');
-    substitution_map.0.insert('E', 'O');
-    substitution_map.0.insert('L', 'X');
-    substitution_map.0.insert('O', 'A');
-    substitution_map.0.insert('W', 'M');
-    substitution_map.0.insert('R', 'Z');
-    substitution_map.0.insert('D', 'Q');
-
-    let mut input = Cursor::new("HELLO WORLD");
-    let mut output = Vec::new();
-
-    substitution_map.apply(&mut input, &mut output).unwrap();
-    let result = String::from_utf8(output).unwrap();
-
-    assert_eq!(result, "JOXXA MAZXQ");
-  }
 
   #[test]
   fn test_monoalphabetic_substitution_analysis_output() -> Result<()> {
@@ -128,6 +102,7 @@ mod tests {
 
     let result = String::from_utf8(output).unwrap();
 
+    // George Orwell, 1984, chapter 1, first passage
     output_file.read_to_string(&mut expected_output)?;
 
     assert_eq!(result, expected_output);

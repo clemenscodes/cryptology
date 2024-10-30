@@ -23,8 +23,6 @@ impl MonoalphabeticSubstition {
 
     let freq = FrequencyAnalyzer::analyze(&mut content.as_bytes(), &mut buf)?;
 
-    println!("{freq}");
-
     let mut freqs: Vec<_> = freq.frequency.iter().collect();
     let mut english_frequencies: Vec<_> = ENGLISH.iter().collect();
     let mut substitution_map: SubstitutionMap = SubstitutionMap(HashMap::new());
