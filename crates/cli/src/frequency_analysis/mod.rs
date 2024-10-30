@@ -1,6 +1,10 @@
+mod frequencies;
+
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::io::{Read, Result, Write};
+
+use frequencies::Frequency;
 
 pub struct FrequencyAnalyzer;
 
@@ -12,15 +16,17 @@ impl FrequencyAnalyzer {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
-    let mut frequency = HashMap::new();
+    let mut frequencies = HashMap::new();
     let mut total_count = 0;
 
     for c in content.chars() {
       if c.is_ascii_alphabetic() {
-        *frequency.entry(c.to_ascii_uppercase()).or_insert(0) += 1;
+        *frequencies.entry(c.to_ascii_uppercase()).or_insert(0) += 1;
         total_count += 1;
       }
     }
+
+    let frequency = Frequency::new(frequencies);
 
     let result = FrequencyResult {
       frequency,
@@ -34,7 +40,7 @@ impl FrequencyAnalyzer {
 
 #[derive(PartialEq, Eq)]
 pub struct FrequencyResult {
-  frequency: HashMap<char, usize>,
+  frequency: Frequency,
   total_count: usize,
 }
 
@@ -44,18 +50,16 @@ impl FrequencyResult {
   }
 }
 
-impl Debug for FrequencyResult {
-  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-    write!(f, "{:?}", self.frequency)
-  }
-}
-
 impl Display for FrequencyResult {
   fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
     writeln!(f, "| Letter | Occurrences | Percentage |")?;
     writeln!(f, "| ------ | ----------- | ---------- |")?;
 
-    let mut entries = self.frequency.iter().collect::<Vec<(&char, &usize)>>();
+    let mut entries = self
+      .frequency
+      .frequencies
+      .iter()
+      .collect::<Vec<(&char, &usize)>>();
 
     entries.sort_by(|a, b| b.1.cmp(a.1));
 
@@ -69,6 +73,12 @@ impl Display for FrequencyResult {
       )?;
     }
     Ok(())
+  }
+}
+
+impl Debug for FrequencyResult {
+  fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+    write!(f, "{:?}", self.frequency)
   }
 }
 
