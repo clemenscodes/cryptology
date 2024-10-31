@@ -1,14 +1,11 @@
 use std::io::{Cursor, Read, Result, Write};
 
-use crate::frequency_analysis::FrequencyAnalyzer;
+use crate::{frequency_analysis::FrequencyAnalyzer, Decipher};
 
 pub struct CaesarCipher;
 
-impl CaesarCipher {
-  pub fn decipher<R: Read, W: Write>(
-    input: &mut R,
-    output: &mut W,
-  ) -> Result<()> {
+impl Decipher<()> for CaesarCipher {
+  fn decipher<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
@@ -28,7 +25,9 @@ impl CaesarCipher {
 
     Ok(())
   }
+}
 
+impl CaesarCipher {
   pub fn find_best_caesar_shift<R: Read>(
     input: &mut R,
   ) -> Result<(String, u8)> {

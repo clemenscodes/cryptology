@@ -185,3 +185,7 @@ impl Command {
     }
   }
 }
+
+pub trait Decipher<T> {
+  fn decipher<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<T>;
+}
