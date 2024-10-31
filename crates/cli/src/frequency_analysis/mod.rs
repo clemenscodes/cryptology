@@ -12,7 +12,7 @@ impl FrequencyAnalyzer {
   pub fn analyze<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
-  ) -> Result<FrequencyResult> {
+  ) -> Result<FrequencyAnalysis> {
     let mut frequency = Frequency::new();
     let mut total_count = 0;
     let mut content = String::new();
@@ -26,7 +26,7 @@ impl FrequencyAnalyzer {
       }
     }
 
-    let result = FrequencyResult {
+    let result = FrequencyAnalysis {
       frequency,
       total_count,
     };
@@ -35,17 +35,18 @@ impl FrequencyAnalyzer {
     Ok(result)
   }
 
-  pub fn chi_square_score(observed: &Frequency, total_count: usize) -> f32 {
+  pub fn chi_square_score(fa: &FrequencyAnalysis) -> f32 {
     const MAX: f32 = 100_000.0;
 
     let mut score = 0.0;
 
     for (letter, &expected_raw_count) in ENGLISH.iter() {
       let normalized_expected_frequency = expected_raw_count as f32 / MAX;
-      let expected_count = normalized_expected_frequency * total_count as f32;
+      let expected_count =
+        normalized_expected_frequency * fa.total_count as f32;
 
       if expected_count > 0.0 {
-        let observed_count = *observed.get(letter).unwrap_or(&0) as f32;
+        let observed_count = *fa.frequency.get(letter).unwrap_or(&0) as f32;
         let difference = observed_count - expected_count;
         let chi_square_component = difference.powi(2) / expected_count;
         score += chi_square_component;
@@ -57,18 +58,18 @@ impl FrequencyAnalyzer {
 }
 
 #[derive(PartialEq, Eq)]
-pub struct FrequencyResult {
+pub struct FrequencyAnalysis {
   pub frequency: Frequency,
   pub total_count: usize,
 }
 
-impl FrequencyResult {
+impl FrequencyAnalysis {
   fn percentage(&self, count: usize) -> f64 {
     (count as f64 / self.total_count as f64) * 100.0
   }
 }
 
-impl Display for FrequencyResult {
+impl Display for FrequencyAnalysis {
   fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
     writeln!(f, "| Letter | Occurrences | Percentage |")?;
     writeln!(f, "| ------ | ----------- | ---------- |")?;
@@ -90,7 +91,7 @@ impl Display for FrequencyResult {
   }
 }
 
-impl Debug for FrequencyResult {
+impl Debug for FrequencyAnalysis {
   fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
     write!(f, "{:?}", self.frequency)
   }
@@ -137,8 +138,12 @@ mod tests {
   #[test]
   fn test_chi_square_perfect_match() {
     let observed: Frequency = ENGLISH.clone();
-    let total_count: usize = observed.values().sum();
-    let score = FrequencyAnalyzer::chi_square_score(&observed, total_count);
+    let total_count = observed.values().sum();
+    let fa = FrequencyAnalysis {
+      frequency: observed,
+      total_count,
+    };
+    let score = FrequencyAnalyzer::chi_square_score(&fa);
     assert!(
       score < 1.0,
       "Chi-square score should be close to 0 for a perfect match"
@@ -175,8 +180,12 @@ mod tests {
       ('Q', 100),
       ('Z', 90),
     ]);
-    let total_count: usize = observed.values().sum();
-    let score = FrequencyAnalyzer::chi_square_score(&observed, total_count);
+    let total_count = observed.values().sum();
+    let fa = FrequencyAnalysis {
+      frequency: observed,
+      total_count,
+    };
+    let score = FrequencyAnalyzer::chi_square_score(&fa);
     assert!(
       score > 1.0 && score < 50.0,
       "Chi-square score should be moderate for slight variations"
@@ -213,8 +222,12 @@ mod tests {
       ('Q', 5000),
       ('Z', 5000),
     ]);
-    let total_count: usize = observed.values().sum();
-    let score = FrequencyAnalyzer::chi_square_score(&observed, total_count);
+    let total_count = observed.values().sum();
+    let fa = FrequencyAnalysis {
+      frequency: observed,
+      total_count,
+    };
+    let score = FrequencyAnalyzer::chi_square_score(&fa);
     assert!(
       score > 1000.0,
       "Chi-square score should be high for large variations"

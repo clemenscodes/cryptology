@@ -1,6 +1,8 @@
+pub mod caesar;
 pub mod frequency_analysis;
 pub mod monoalphabetic_substitution;
 
+use caesar::CaesarCipher;
 use clap::{Parser, Subcommand};
 use monoalphabetic_substitution::MonoalphabeticSubstition;
 use std::fs::File;
@@ -100,6 +102,20 @@ pub enum Command {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
   },
+
+  /// Decrypt a Caesar cipher using chi-square analysis.
+  ///
+  /// This command automatically finds the correct shift to decipher
+  /// the text based on English letter frequency.
+  #[command(
+    name = "caesar",
+    visible_aliases = ["caesar-decipher", "cd"],
+    version,
+  )]
+  Caesar {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+  },
 }
 
 impl Command {
@@ -113,6 +129,11 @@ impl Command {
       Command::MonoalphabeticSubstitution { default_args } => {
         let (mut input, mut output) = self.get_files(default_args)?;
         MonoalphabeticSubstition::analyze(&mut input, &mut output)?;
+        Ok(())
+      }
+      Command::Caesar { default_args } => {
+        let (mut input, mut output) = self.get_files(default_args)?;
+        CaesarCipher::decipher(&mut input, &mut output)?;
         Ok(())
       }
     }
