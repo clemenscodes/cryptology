@@ -94,7 +94,7 @@ pub enum Command {
   /// This command sorts the ciphertext letters by frequency and provides
   /// hints based on common letter frequencies for decryption.
   #[command(
-    name = "monoalphabetic-substition",
+    name = "monoalphabetic-substitution",
     visible_aliases = ["monosub", "ms"],
     version,
   )]
