@@ -4,11 +4,15 @@ use std::io::{Read, Result, Write};
 
 pub type SubstitionMapType = BTreeMap<char, char>;
 
-pub struct SubstitutionMap(pub SubstitionMapType);
+pub struct SubstitutionMap(SubstitionMapType);
 
 impl SubstitutionMap {
   pub fn new() -> Self {
     Self(SubstitionMapType::new())
+  }
+
+  pub fn insert(&mut self, source: char, target: char) {
+    self.0.insert(source, target);
   }
 }
 
@@ -81,30 +85,30 @@ mod tests {
 
     let mut substitution_map = SubstitutionMap(SubstitionMapType::new());
 
-    substitution_map.0.insert('Q', 'E');
-    substitution_map.0.insert('G', 'T');
-    substitution_map.0.insert('D', 'O');
-    substitution_map.0.insert('R', 'A');
-    substitution_map.0.insert('X', 'I');
-    substitution_map.0.insert('U', 'N');
-    substitution_map.0.insert('K', 'S');
-    substitution_map.0.insert('P', 'H');
-    substitution_map.0.insert('Y', 'R');
-    substitution_map.0.insert('V', 'L');
-    substitution_map.0.insert('E', 'D');
-    substitution_map.0.insert('I', 'W');
-    substitution_map.0.insert('S', 'F');
-    substitution_map.0.insert('N', 'C');
-    substitution_map.0.insert('H', 'U');
-    substitution_map.0.insert('T', 'G');
-    substitution_map.0.insert('O', 'Y');
-    substitution_map.0.insert('L', 'M');
-    substitution_map.0.insert('A', 'P');
-    substitution_map.0.insert('W', 'B');
-    substitution_map.0.insert('M', 'V');
-    substitution_map.0.insert('C', 'K');
-    substitution_map.0.insert('J', 'Z');
-    substitution_map.0.insert('B', 'Q');
+    substitution_map.insert('Q', 'E');
+    substitution_map.insert('G', 'T');
+    substitution_map.insert('D', 'O');
+    substitution_map.insert('R', 'A');
+    substitution_map.insert('X', 'I');
+    substitution_map.insert('U', 'N');
+    substitution_map.insert('K', 'S');
+    substitution_map.insert('P', 'H');
+    substitution_map.insert('Y', 'R');
+    substitution_map.insert('V', 'L');
+    substitution_map.insert('E', 'D');
+    substitution_map.insert('I', 'W');
+    substitution_map.insert('S', 'F');
+    substitution_map.insert('N', 'C');
+    substitution_map.insert('H', 'U');
+    substitution_map.insert('T', 'G');
+    substitution_map.insert('O', 'Y');
+    substitution_map.insert('L', 'M');
+    substitution_map.insert('A', 'P');
+    substitution_map.insert('W', 'B');
+    substitution_map.insert('M', 'V');
+    substitution_map.insert('C', 'K');
+    substitution_map.insert('J', 'Z');
+    substitution_map.insert('B', 'Q');
 
     substitution_map
       .apply(&mut input_file, &mut output)

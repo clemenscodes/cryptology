@@ -1,5 +1,5 @@
 pub mod english;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
-pub type Frequency = HashMap<char, usize>;
+pub type Frequency = BTreeMap<char, usize>;

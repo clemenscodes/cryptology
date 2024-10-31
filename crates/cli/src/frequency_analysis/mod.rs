@@ -1,6 +1,5 @@
 pub mod frequencies;
 
-use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::io::{Read, Result, Write};
 
@@ -13,11 +12,11 @@ impl FrequencyAnalyzer {
     input: &mut R,
     output: &mut W,
   ) -> Result<FrequencyResult> {
-    let mut content = String::new();
-    input.read_to_string(&mut content)?;
-
-    let mut frequency: Frequency = HashMap::new();
+    let mut frequency = Frequency::new();
     let mut total_count = 0;
+    let mut content = String::new();
+
+    input.read_to_string(&mut content)?;
 
     for c in content.chars() {
       if c.is_ascii_alphabetic() {

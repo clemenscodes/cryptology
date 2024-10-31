@@ -1,9 +1,9 @@
-use std::{collections::HashMap, sync::LazyLock};
+use std::{collections::BTreeMap, sync::LazyLock};
 
 use super::Frequency;
 
 pub static ENGLISH: LazyLock<Frequency> = LazyLock::new(|| {
-  HashMap::from([
+  BTreeMap::from([
     ('E', 12359),
     ('T', 8952),
     ('A', 8050),
