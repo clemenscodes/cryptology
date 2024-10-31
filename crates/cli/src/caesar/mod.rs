@@ -46,7 +46,6 @@ impl CaesarCipher {
       let mut buf = Cursor::new(candidate.as_bytes());
       let mut output = Vec::new();
       let fa = FrequencyAnalyzer::analyze(&mut buf, &mut output)?;
-
       let score = FrequencyAnalyzer::chi_square_score(&fa);
 
       if score < best_score {
