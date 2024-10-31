@@ -15,7 +15,8 @@ impl CaesarCipher {
     let decrypted_lines: Vec<String> = content
       .lines()
       .map(|line| {
-        Self::find_best_caesar_shift(&mut Cursor::new(line.as_bytes()))
+        let mut content = Cursor::new(line);
+        Self::find_best_caesar_shift(&mut content)
           .map(|(decipher, _)| decipher)
           .unwrap_or(String::from(line))
       })
@@ -34,11 +35,18 @@ impl CaesarCipher {
     let mut best_score = f32::MAX;
     let mut best_plaintext = String::new();
     let mut best_shift = 0;
+    let mut buf = String::new();
+
+    input.read_to_string(&mut buf)?;
 
     for shift in 0..26 {
-      let candidate = Self::decrypt_caesar_cipher(input, shift)?;
+      let copy = buf.clone();
+      let mut cursor = Cursor::new(copy.as_bytes());
+      let candidate = Self::decrypt_caesar_cipher(&mut cursor, shift)?;
+      let mut buf = Cursor::new(candidate.as_bytes());
       let mut output = Vec::new();
-      let fa = FrequencyAnalyzer::analyze(input, &mut output)?;
+      let fa = FrequencyAnalyzer::analyze(&mut buf, &mut output)?;
+
       let score = FrequencyAnalyzer::chi_square_score(&fa);
 
       if score < best_score {
