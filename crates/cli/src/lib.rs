@@ -1,6 +1,7 @@
 pub mod caesar;
 pub mod frequency_analysis;
 pub mod monoalphabetic_substitution;
+pub mod vigenere;
 
 use caesar::CaesarCipher;
 use clap::{Parser, Subcommand};
@@ -8,6 +9,7 @@ use monoalphabetic_substitution::MonoalphabeticSubstition;
 use std::fs::File;
 use std::io::{self, Read, Result, Write};
 use std::path::PathBuf;
+use vigenere::VigenereCypher;
 
 use frequency_analysis::FrequencyAnalyzer;
 
@@ -109,10 +111,22 @@ pub enum Command {
   /// the text based on English letter frequency.
   #[command(
     name = "caesar",
-    visible_aliases = ["caesar-decipher", "cd"],
+    visible_aliases = ["c"],
     version,
   )]
   Caesar {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+  },
+
+  /// Decrypt a Vigenere cipher
+  ///
+  #[command(
+    name = "vigenere",
+    visible_aliases = ["v"],
+    version,
+  )]
+  Vigenere {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
   },
@@ -134,6 +148,11 @@ impl Command {
       Command::Caesar { default_args } => {
         let (mut input, mut output) = self.get_files(default_args)?;
         CaesarCipher::decipher(&mut input, &mut output)?;
+        Ok(())
+      }
+      Command::Vigenere { default_args } => {
+        let (mut input, mut output) = self.get_files(default_args)?;
+        VigenereCypher::decipher(&mut input, &mut output)?;
         Ok(())
       }
     }
