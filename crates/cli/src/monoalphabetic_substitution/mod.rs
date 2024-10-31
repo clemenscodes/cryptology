@@ -14,7 +14,7 @@ impl MonoalphabeticSubstition {
   pub fn analyze<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
-  ) -> Result<()> {
+  ) -> Result<SubstitutionMap> {
     let mut content = String::new();
     let mut buf = Vec::new();
     let mut substitution_map = SubstitutionMap::default();
@@ -34,7 +34,7 @@ impl MonoalphabeticSubstition {
     write!(output, "{substitution_map}")?;
 
     substitution_map.apply(&mut content.as_bytes(), output)?;
-    Ok(())
+    Ok(substitution_map)
   }
 }
 

@@ -7,8 +7,8 @@ pub type SubstitionMapType = BTreeMap<char, char>;
 pub struct SubstitutionMap(SubstitionMapType);
 
 impl SubstitutionMap {
-  pub fn new() -> Self {
-    Self(SubstitionMapType::new())
+  pub fn new(map: SubstitionMapType) -> Self {
+    Self(map)
   }
 
   pub fn insert(&mut self, source: char, target: char) {
@@ -18,7 +18,7 @@ impl SubstitutionMap {
 
 impl Default for SubstitutionMap {
   fn default() -> Self {
-    Self::new()
+    Self::new(SubstitionMapType::default())
   }
 }
 
@@ -82,8 +82,7 @@ mod tests {
     let mut output_file = File::open(&output_path)?;
     let mut output = Vec::new();
     let mut expected_output = String::new();
-
-    let mut substitution_map = SubstitutionMap(SubstitionMapType::new());
+    let mut substitution_map = SubstitutionMap::default();
 
     substitution_map.insert('Q', 'E');
     substitution_map.insert('G', 'T');

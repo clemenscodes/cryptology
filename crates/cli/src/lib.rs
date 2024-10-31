@@ -112,7 +112,8 @@ impl Command {
       }
       Command::MonoalphabeticSubstitution { default_args } => {
         let (mut input, mut output) = self.get_files(default_args)?;
-        MonoalphabeticSubstition::analyze(&mut input, &mut output)
+        MonoalphabeticSubstition::analyze(&mut input, &mut output)?;
+        Ok(())
       }
     }
   }
