@@ -57,7 +57,7 @@ impl CaesarCipher {
     Ok((best_plaintext, best_shift))
   }
 
-  fn decrypt_caesar_cipher<R: Read>(
+  pub fn decrypt_caesar_cipher<R: Read>(
     input: &mut R,
     shift: u8,
   ) -> Result<String> {
@@ -110,10 +110,150 @@ mod tests {
     let mut expected_output = String::new();
     File::open(&output_path)?.read_to_string(&mut expected_output)?;
 
-    let output_string = String::from_utf8(output_buffer)
-      .expect("Failed to convert output buffer to UTF-8 string");
+    let output_string = String::from_utf8(output_buffer).unwrap();
 
     assert_eq!(output_string, expected_output);
+    Ok(())
+  }
+
+  #[test]
+  fn test_decipher_with_shift_0() -> Result<()> {
+    let mut input = Cursor::new("No shift should keep the text unchanged.");
+    let mut output = Vec::new();
+
+    CaesarCipher::decipher(&mut input, &mut output)?;
+
+    let output_string = String::from_utf8(output).unwrap();
+
+    assert_eq!(
+      output_string.trim(),
+      "No shift should keep the text unchanged."
+    );
+    Ok(())
+  }
+
+  #[test]
+  fn test_decipher_with_known_shift() -> Result<()> {
+    let mut input = Cursor::new("Uif tfdsfu jt tbgf!");
+    let mut output = Vec::new();
+
+    CaesarCipher::decipher(&mut input, &mut output)?;
+
+    let output_string = String::from_utf8(output).unwrap();
+
+    assert_eq!(output_string.trim(), "The secret is safe!");
+    Ok(())
+  }
+
+  #[test]
+  fn test_decipher_with_punctuation() -> Result<()> {
+    let mut input = Cursor::new("Efgfoe! B cpoh.");
+    let mut output = Vec::new();
+
+    CaesarCipher::decipher(&mut input, &mut output)?;
+
+    let output_string = String::from_utf8(output).unwrap();
+
+    assert_eq!(output_string.trim(), "Defend! A bong.");
+    Ok(())
+  }
+
+  #[test]
+  fn test_decipher_handles_empty_input() -> Result<()> {
+    let mut input = Cursor::new("");
+    let mut output = Vec::new();
+
+    CaesarCipher::decipher(&mut input, &mut output)?;
+
+    let output_string = String::from_utf8(output).unwrap();
+
+    assert_eq!(output_string.trim(), "");
+    Ok(())
+  }
+
+  #[test]
+  fn test_decipher_handles_non_ascii_characters() -> Result<()> {
+    let mut input = Cursor::new("¡Hola! ¿Cómo estás?");
+    let mut output = Vec::new();
+
+    CaesarCipher::decipher(&mut input, &mut output)?;
+
+    let output_string = String::from_utf8(output).unwrap();
+
+    assert_eq!(output_string.trim(), "¡Hola! ¿Cómo estás?");
+    Ok(())
+  }
+
+  #[test]
+  fn test_find_best_caesar_shift() -> Result<()> {
+    let mut input = Cursor::new("Dro aesmu lbygx pyh tewzc yfob dro vkji nyq.");
+    let (plaintext, shift) = CaesarCipher::find_best_caesar_shift(&mut input)?;
+
+    assert_eq!(plaintext, "The quick brown fox jumps over the lazy dog.");
+    assert_eq!(shift, 10);
+    Ok(())
+  }
+
+  #[test]
+  fn test_decrypt_caesar_cipher_shift_0() -> Result<()> {
+    let mut input = Cursor::new("No shift should keep the text unchanged.");
+    let decrypted = CaesarCipher::decrypt_caesar_cipher(&mut input, 0)?;
+
+    assert_eq!(decrypted, "No shift should keep the text unchanged.");
+    Ok(())
+  }
+
+  #[test]
+  fn test_decrypt_caesar_cipher_shift_13() -> Result<()> {
+    let mut input = Cursor::new("Gur fhowrpg vf onfrq ba gur cnfg.");
+    let decrypted = CaesarCipher::decrypt_caesar_cipher(&mut input, 13)?;
+
+    assert_eq!(decrypted, "The subject is based on the past.");
+    Ok(())
+  }
+
+  #[test]
+  fn test_decrypt_caesar_cipher_with_mixed_case() -> Result<()> {
+    let mut input =
+      Cursor::new("Uifsf bsf TPNF ipnf ubtl uibu offet pme GFEvsbujpo.");
+
+    let decrypted = CaesarCipher::decrypt_caesar_cipher(&mut input, 1)?;
+
+    assert_eq!(
+      decrypted,
+      "There are SOME home task that needs old FEDuration."
+    );
+    Ok(())
+  }
+
+  #[test]
+  fn test_decrypt_caesar_cipher_empty_string() -> Result<()> {
+    let mut input = Cursor::new("");
+    let decrypted = CaesarCipher::decrypt_caesar_cipher(&mut input, 5)?;
+
+    assert_eq!(decrypted, "");
+    Ok(())
+  }
+
+  #[test]
+  fn test_decrypt_caesar_cipher_all_letters_shift_13() -> Result<()> {
+    let mut input =
+      Cursor::new("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+    let decrypted = CaesarCipher::decrypt_caesar_cipher(&mut input, 13)?;
+
+    assert_eq!(
+      decrypted,
+      "NOPQRSTUVWXYZABCDEFGHIJKLMnopqrstuvwxyzabcdefghijklm"
+    );
+    Ok(())
+  }
+
+  #[test]
+  fn test_decrypt_caesar_cipher_numbers_and_symbols() -> Result<()> {
+    let mut input = Cursor::new("12345 !@#$%^&*()_+");
+    let decrypted = CaesarCipher::decrypt_caesar_cipher(&mut input, 7)?;
+
+    assert_eq!(decrypted, "12345 !@#$%^&*()_+");
     Ok(())
   }
 }
