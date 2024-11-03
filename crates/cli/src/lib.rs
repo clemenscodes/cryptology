@@ -9,7 +9,7 @@ use monoalphabetic_substitution::MonoalphabeticSubstition;
 use std::fs::File;
 use std::io::{self, Read, Result, Write};
 use std::path::PathBuf;
-use vigenere::VigenereCypher;
+use vigenere::{VigenereConfig, VigenereCypher};
 
 use frequency_analysis::FrequencyAnalyzer;
 
@@ -129,6 +129,17 @@ pub enum Command {
   Vigenere {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
+
+    /// Path to the output file for saving results.
+    ///
+    /// If not provided, outputs to standard output.
+    #[arg(
+      short = 'l',
+      long = "max-key-length",
+      value_name = "MAX_KEY_LENGTH",
+      help = "Specify the maximum length for the key. 20 by default"
+    )]
+    max_key_length: Option<u8>,
   },
 }
 
@@ -136,56 +147,58 @@ impl Command {
   pub fn execute(&self) -> Result<()> {
     match self {
       Command::FrequencyAnalysis { default_args } => {
-        let (mut input, mut output) = self.get_files(default_args)?;
+        let (mut input, mut output) = Self::get_files(default_args);
         FrequencyAnalyzer::analyze(&mut input, &mut output)?;
         Ok(())
       }
       Command::MonoalphabeticSubstitution { default_args } => {
-        let (mut input, mut output) = self.get_files(default_args)?;
+        let (mut input, mut output) = Self::get_files(default_args);
         MonoalphabeticSubstition::analyze(&mut input, &mut output)?;
         Ok(())
       }
       Command::Caesar { default_args } => {
-        let (mut input, mut output) = self.get_files(default_args)?;
-        CaesarCipher::decipher(&mut input, &mut output)?;
-        Ok(())
+        let (mut input, mut output) = Self::get_files(default_args);
+        CaesarCipher::decrypt(&mut input, &mut output)
       }
-      Command::Vigenere { default_args } => {
-        let (mut input, mut output) = self.get_files(default_args)?;
-        VigenereCypher::decipher(&mut input, &mut output)?;
-        Ok(())
+      Command::Vigenere { default_args, .. } => {
+        let (mut input, mut output) = Self::get_files(default_args);
+        let config: VigenereConfig = self.into();
+        VigenereCypher::decrypt(&mut input, &mut output, config)
       }
     }
   }
 
   fn get_files(
-    &self,
     default_args: &CryptologyDefaultArgs,
-  ) -> Result<(Box<dyn Read>, Box<dyn Write>)> {
-    let input_data = self.open_input(&default_args.input)?;
-    let output_data = self.create_output(&default_args.output)?;
-    Ok((input_data, output_data))
+  ) -> (Box<dyn Read>, Box<dyn Write>) {
+    let input_data = Self::open_input(&default_args.input);
+    let output_data = Self::create_output(&default_args.output);
+    (input_data, output_data)
   }
 
-  fn open_input(&self, input: &Option<PathBuf>) -> Result<Box<dyn Read>> {
+  fn open_input(input: &Option<PathBuf>) -> Box<dyn Read> {
     match input {
-      Some(path) => Ok(Box::new(
-        File::open(path).expect("Failed to open input file"),
-      )),
-      None => Ok(Box::new(io::stdin())),
+      Some(path) => {
+        Box::new(File::open(path).expect("Failed to open input file"))
+      }
+      None => Box::new(io::stdin()),
     }
   }
 
-  fn create_output(&self, output: &Option<PathBuf>) -> Result<Box<dyn Write>> {
+  fn create_output(output: &Option<PathBuf>) -> Box<dyn Write> {
     match output {
-      Some(path) => Ok(Box::new(
-        File::create(path).expect("Failed to create output file"),
-      )),
-      None => Ok(Box::new(io::stdout())),
+      Some(path) => {
+        Box::new(File::create(path).expect("Failed to create output file"))
+      }
+      None => Box::new(io::stdout()),
     }
   }
 }
 
-pub trait Decipher<T> {
-  fn decipher<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<T>;
+pub trait Decrypt<T> {
+  fn decrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<T>;
+}
+
+pub trait Encrypt<T> {
+  fn encrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<T>;
 }

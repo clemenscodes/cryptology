@@ -1,11 +1,11 @@
 use std::io::{Cursor, Read, Result, Write};
 
-use crate::{frequency_analysis::FrequencyAnalyzer, Decipher};
+use crate::{frequency_analysis::FrequencyAnalyzer, Decrypt};
 
 pub struct CaesarCipher;
 
-impl Decipher<()> for CaesarCipher {
-  fn decipher<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
+impl Decrypt<()> for CaesarCipher {
+  fn decrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
@@ -105,7 +105,7 @@ mod tests {
     let mut input_file = File::open(&input_path)?;
     let mut output_buffer = Vec::new();
 
-    CaesarCipher::decipher(&mut input_file, &mut output_buffer)?;
+    CaesarCipher::decrypt(&mut input_file, &mut output_buffer)?;
 
     let mut expected_output = String::new();
     File::open(&output_path)?.read_to_string(&mut expected_output)?;
@@ -121,7 +121,7 @@ mod tests {
     let mut input = Cursor::new("No shift should keep the text unchanged.");
     let mut output = Vec::new();
 
-    CaesarCipher::decipher(&mut input, &mut output)?;
+    CaesarCipher::decrypt(&mut input, &mut output)?;
 
     let output_string = String::from_utf8(output).unwrap();
 
@@ -137,7 +137,7 @@ mod tests {
     let mut input = Cursor::new("Uif tfdsfu jt tbgf!");
     let mut output = Vec::new();
 
-    CaesarCipher::decipher(&mut input, &mut output)?;
+    CaesarCipher::decrypt(&mut input, &mut output)?;
 
     let output_string = String::from_utf8(output).unwrap();
 
@@ -150,7 +150,7 @@ mod tests {
     let mut input = Cursor::new("Efgfoe! B cpoh.");
     let mut output = Vec::new();
 
-    CaesarCipher::decipher(&mut input, &mut output)?;
+    CaesarCipher::decrypt(&mut input, &mut output)?;
 
     let output_string = String::from_utf8(output).unwrap();
 
@@ -163,7 +163,7 @@ mod tests {
     let mut input = Cursor::new("");
     let mut output = Vec::new();
 
-    CaesarCipher::decipher(&mut input, &mut output)?;
+    CaesarCipher::decrypt(&mut input, &mut output)?;
 
     let output_string = String::from_utf8(output).unwrap();
 
@@ -176,7 +176,7 @@ mod tests {
     let mut input = Cursor::new("¡Hola! ¿Cómo estás?");
     let mut output = Vec::new();
 
-    CaesarCipher::decipher(&mut input, &mut output)?;
+    CaesarCipher::decrypt(&mut input, &mut output)?;
 
     let output_string = String::from_utf8(output).unwrap();
 
