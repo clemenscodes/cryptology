@@ -173,6 +173,32 @@ impl VigenereCipher {
       .collect()
   }
 
+  fn generate_keys(key_length: usize) -> Vec<String> {
+    let mut keys = Vec::new();
+    let mut key = vec![b'A'; key_length - 1];
+
+    loop {
+      keys.push(String::from_utf8(key.clone()).unwrap());
+
+      let mut index = key_length - 1;
+      while index > 0 {
+        index -= 1;
+        if key[index] < b'Z' {
+          key[index] += 1;
+          break;
+        } else {
+          key[index] = b'A';
+        }
+      }
+
+      if index == 0 && key[0] == b'A' {
+        break;
+      }
+    }
+
+    keys
+  }
+
   fn decrypt_with_key<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
@@ -410,6 +436,26 @@ mod tests {
       key_pairs,
       vec!["VI".to_string(), "EN".to_string(), "RE".to_string()]
     );
+  }
+
+  #[test]
+  fn test_generate_keys_length() {
+    let key_length = 3;
+    let keys = VigenereCipher::generate_keys(key_length);
+    let mut expected = Vec::new();
+    for first in b'A'..=b'Z' {
+      for second in b'A'..=b'Z' {
+        expected.push(format!("{}{}", first as char, second as char));
+      }
+    }
+    assert_eq!(keys, expected);
+  }
+
+  #[test]
+  fn test_generate_keys_length_4() {
+    let key_length: usize = 4;
+    let keys = VigenereCipher::generate_keys(key_length);
+    assert_eq!(keys.len(), 26_u32.pow((key_length - 1) as u32) as usize); // There should be 26^3 keys for key length 4
   }
 
   #[test]

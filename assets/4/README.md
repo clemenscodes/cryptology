@@ -20,7 +20,7 @@ needs exponential time $`O = c^n \leftarrow c > 1`$.
 
 Submit your solution via Moodle as an archive (.tar.gz or .zip) file that contains your
 dockerized program and a docker environment to execute your program. The name of the output
-file must be `solution.txt`.  
+file must be `solution.txt`.
 Assume that the name of the input file is `ciphertext.txt`.
 
 ## Help
@@ -43,7 +43,7 @@ You observe that the letters VH, EM, and RD are encrypted with the first two let
 
 a. Cut the ciphertext to strings with the size of the key length. Each column is then encoded with one letter.
 
-Example:  
+Example:
 Suppose the key is **ABC**. The ciphertext **VIGENERE** should be cut into:
 
     VIG
