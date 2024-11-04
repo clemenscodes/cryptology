@@ -71,11 +71,31 @@ impl VigenereCipher {
     output: &mut W,
     config: VigenereEncryptConfig,
   ) -> Result<()> {
+    let key = config.key.to_uppercase();
+    let key_length = key.len();
     let mut content = String::new();
+    let mut key_index = 0;
 
     input.read_to_string(&mut content)?;
 
-    writeln!(output, "{}", config.key)?;
+    let cipher: String = content
+      .chars()
+      .map(|c| {
+        if c.is_ascii_alphabetic() {
+          let key_char = key.chars().nth(key_index % key_length).unwrap();
+          key_index += 1;
+
+          let base = if c.is_ascii_lowercase() { b'a' } else { b'A' };
+          let key_shift = key_char as u8 - b'A';
+
+          (((c as u8 - base + key_shift) % 26) + base) as char
+        } else {
+          c
+        }
+      })
+      .collect();
+
+    write!(output, "{cipher}")?;
     Ok(())
   }
 
@@ -205,5 +225,47 @@ mod tests {
 
     assert_eq!(output_string, expected_output);
     Ok(())
+  }
+
+  #[test]
+  fn test_vigenere_encrypt() {
+    let input_text = "HELLO WORLD";
+    let key = "KEY";
+    let mut input = Cursor::new(input_text);
+    let mut output = Vec::new();
+    let config = VigenereEncryptConfig::new(key);
+
+    VigenereCipher::encrypt(&mut input, &mut output, config).unwrap();
+    let encrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(encrypted_text, "RIJVS UYVJN");
+  }
+
+  #[test]
+  fn test_vigenere_encrypt_with_lowercase() {
+    let input_text = "hello world";
+    let key = "key";
+    let mut input = Cursor::new(input_text);
+    let mut output = Vec::new();
+    let config = VigenereEncryptConfig::new(key);
+
+    VigenereCipher::encrypt(&mut input, &mut output, config).unwrap();
+    let encrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(encrypted_text, "rijvs uyvjn");
+  }
+
+  #[test]
+  fn test_vigenere_encrypt_with_non_alpha_chars() {
+    let input_text = "HELLO, WORLD!";
+    let key = "KEY";
+    let mut input = Cursor::new(input_text);
+    let mut output = Vec::new();
+    let config = VigenereEncryptConfig::new(key);
+
+    VigenereCipher::encrypt(&mut input, &mut output, config).unwrap();
+    let encrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(encrypted_text, "RIJVS, UYVJN!");
   }
 }

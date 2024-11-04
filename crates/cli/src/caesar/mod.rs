@@ -1,11 +1,14 @@
 use std::io::{Cursor, Read, Result, Write};
 
-use crate::{frequency_analysis::FrequencyAnalyzer, Decrypt};
+use crate::frequency_analysis::FrequencyAnalyzer;
 
 pub struct CaesarCipher;
 
-impl Decrypt for CaesarCipher {
-  fn decrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
+impl CaesarCipher {
+  pub fn decrypt<R: Read, W: Write>(
+    input: &mut R,
+    output: &mut W,
+  ) -> Result<()> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 

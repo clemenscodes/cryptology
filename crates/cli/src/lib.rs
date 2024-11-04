@@ -236,11 +236,3 @@ impl Command {
     }
   }
 }
-
-pub trait Decrypt {
-  fn decrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()>;
-}
-
-pub trait Encrypt {
-  fn encrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()>;
-}
