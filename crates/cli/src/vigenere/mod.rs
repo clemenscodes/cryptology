@@ -1,4 +1,4 @@
-use std::io::{Read, Result, Write};
+use std::io::{Cursor, Read, Result, Write};
 
 use crate::{DecryptCipher, EncryptCipher};
 
@@ -166,6 +166,13 @@ impl VigenereCipher {
     Ok(chunks)
   }
 
+  pub fn key_pairs(segments: Vec<String>, key_length: u8) -> Vec<String> {
+    segments
+      .iter()
+      .map(|segment| segment.chars().take((key_length - 1).into()).collect())
+      .collect()
+  }
+
   fn decrypt_with_key<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
@@ -199,15 +206,34 @@ impl VigenereCipher {
     Ok(())
   }
 
-  fn decrypt_with_key_length<R: Read, W: Write>(
-    input: &mut R,
-    _output: &mut W,
-    _key_length: u8,
-  ) -> Result<()> {
+  fn text_pairs<R: Read>(input: &mut R, key_length: u8) -> Result<Vec<String>> {
     let mut content = String::new();
+
     input.read_to_string(&mut content)?;
 
-    todo!();
+    let mut buf = Cursor::new(content.into_bytes());
+
+    let segments = Self::segment_text(&mut buf, key_length)?;
+    let key_pairs = Self::key_pairs(segments, key_length);
+
+    Ok(key_pairs)
+  }
+
+  fn decrypt_with_key_length<R: Read, W: Write>(
+    input: &mut R,
+    output: &mut W,
+    key_length: u8,
+  ) -> Result<()> {
+    let mut content = String::new();
+
+    input.read_to_string(&mut content)?;
+
+    let mut in_buf = Cursor::new(content.into_bytes());
+
+    let key_pairs = Self::text_pairs(&mut in_buf, key_length)?;
+
+    writeln!(output, "{key_pairs:#?}")?;
+    Ok(())
   }
 
   fn decrypt_with_max_key_length<R: Read, W: Write>(
@@ -340,15 +366,14 @@ mod tests {
   #[test]
   fn test_segment_text_by_key_length_with_spaces() {
     let mut text = Cursor::new("VIGENERE CIPHER");
-    let key_length = 3;
+    let key_length = 4;
     let segments = VigenereCipher::segment_text(&mut text, key_length).unwrap();
     assert_eq!(
       segments,
       vec![
-        "VIG".to_string(),
-        "ENE".to_string(),
-        "REC".to_string(),
-        "IPH".to_string(),
+        "VIGE".to_string(),
+        "NERE".to_string(),
+        "CIPH".to_string(),
         "ER".to_string()
       ]
     );
@@ -357,9 +382,34 @@ mod tests {
   #[test]
   fn test_segment_text_by_key_length_with_non_alpha() {
     let mut text = Cursor::new("V1G3N!E#R$E%");
+    let key_length = 5;
+    let segments = VigenereCipher::segment_text(&mut text, key_length).unwrap();
+    assert_eq!(segments, vec!["VGNER".to_string(), "E".to_string()]);
+  }
+
+  #[test]
+  fn test_key_pairs() {
+    let mut text = Cursor::new("VIGENERE");
     let key_length = 3;
     let segments = VigenereCipher::segment_text(&mut text, key_length).unwrap();
-    assert_eq!(segments, vec!["VGN".to_string(), "ERE".to_string()]);
+    let key_pairs = VigenereCipher::key_pairs(segments, key_length);
+
+    assert_eq!(
+      key_pairs,
+      vec!["VI".to_string(), "EN".to_string(), "RE".to_string()]
+    );
+  }
+
+  #[test]
+  fn test_text_pairs() {
+    let mut text = Cursor::new("VIGENERE");
+    let key_length = 3;
+    let key_pairs = VigenereCipher::text_pairs(&mut text, key_length).unwrap();
+
+    assert_eq!(
+      key_pairs,
+      vec!["VI".to_string(), "EN".to_string(), "RE".to_string()]
+    );
   }
 
   #[test]
