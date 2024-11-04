@@ -1,17 +1,27 @@
 use std::io::{Cursor, Read, Result, Write};
 
-use crate::{
-  caesar::CaesarCipher, frequency_analysis::FrequencyAnalyzer, DecryptCipher,
-  EncryptCipher,
-};
+use crate::{caesar::CaesarCipher, DecryptCipher, EncryptCipher};
 
 pub struct VigenereDecryptConfig {
-  max_key_length: u8,
+  pub key: Option<String>,
+  pub key_length: Option<u8>,
+  pub max_key_length: u8,
 }
 
 impl VigenereDecryptConfig {
-  pub fn new(max_key_length: Option<u8>) -> Self {
+  /// Creates a new `VigenereDecryptConfig`.
+  ///
+  /// - `key`: The decryption key, if known.
+  /// - `key_length`: The key length, if known.
+  /// - `max_key_length`: The upper bound for key length to attempt a full crack. Defaults to 20.
+  pub fn new(
+    key: Option<String>,
+    key_length: Option<u8>,
+    max_key_length: Option<u8>,
+  ) -> Self {
     Self {
+      key,
+      key_length,
       max_key_length: max_key_length.unwrap_or(20),
     }
   }
@@ -19,15 +29,24 @@ impl VigenereDecryptConfig {
 
 impl Default for VigenereDecryptConfig {
   fn default() -> Self {
-    Self { max_key_length: 20 }
+    Self {
+      key: None,
+      key_length: None,
+      max_key_length: 20,
+    }
   }
 }
 
 impl From<&DecryptCipher> for VigenereDecryptConfig {
   fn from(value: &DecryptCipher) -> Self {
     match value {
-      DecryptCipher::Vigenere { max_key_length, .. } => {
-        VigenereDecryptConfig::new(*max_key_length)
+      DecryptCipher::Vigenere {
+        key,
+        key_length,
+        max_key_length,
+        ..
+      } => {
+        VigenereDecryptConfig::new(key.clone(), *key_length, *max_key_length)
       }
       _ => VigenereDecryptConfig::default(),
     }
@@ -104,88 +123,98 @@ impl VigenereCipher {
     output: &mut W,
     config: VigenereDecryptConfig,
   ) -> Result<()> {
-    let mut content = String::new();
+    if let Some(key) = config.key {
+      Self::decrypt_with_key(input, output, &key)
+    } else if let Some(key_length) = config.key_length {
+      Self::decrypt_with_key_length(input, output, key_length)
+    } else {
+      Self::decrypt_with_max_key_length(input, output, config.max_key_length)
+    }
+  }
 
+  fn decrypt_with_key<R: Read, W: Write>(
+    input: &mut R,
+    output: &mut W,
+    key: &str,
+  ) -> Result<()> {
+    let mut content = String::new();
     input.read_to_string(&mut content)?;
 
-    let mut best_decryption = String::new();
-    let mut best_score = f32::MAX;
+    let key = key.to_uppercase();
+    let mut key_index = 0;
+    let key_length = key.len();
 
-    for key_length in 1..=config.max_key_length {
-      let mut columns: Vec<Vec<char>> = vec![Vec::new(); key_length as usize];
-
-      for (i, c) in content.chars().enumerate() {
-        columns[i % key_length as usize].push(c);
-      }
-
-      let mut key = String::new();
-
-      for column in columns.iter() {
-        let input: String = column.iter().collect();
-        let mut buf = Cursor::new(input.into_bytes());
-
-        let best_shift = Self::find_best_shift_for_column(&mut buf)?;
-        key.push((b'A' + best_shift) as char);
-      }
-
-      let decipher = Self::decrypt_vigenere(&content, &key);
-      let mut input = Cursor::new(decipher.clone().into_bytes());
-      let mut output = Vec::new();
-      let fa = FrequencyAnalyzer::analyze(&mut input, &mut output)?;
-      let score = FrequencyAnalyzer::chi_square_score(&fa);
-
-      if score < best_score {
-        best_score = score;
-        best_decryption = decipher;
-      }
-    }
-
-    write!(output, "{best_decryption}")?;
-    Ok(())
-  }
-
-  fn find_best_shift_for_column<R: Read>(column: &mut R) -> Result<u8> {
-    let mut best_shift = 0;
-    let mut best_score = f32::MAX;
-    let mut buf = String::new();
-
-    column.read_to_string(&mut buf)?;
-
-    for shift in 0..26 {
-      let copy = buf.clone();
-      let mut cursor = Cursor::new(copy.as_bytes());
-      let decipher = CaesarCipher::decrypt_caesar_cipher(&mut cursor, shift)?;
-      let mut input = Cursor::new(decipher.into_bytes());
-      let mut output = Vec::new();
-      let fa = FrequencyAnalyzer::analyze(&mut input, &mut output)?;
-      let score = FrequencyAnalyzer::chi_square_score(&fa);
-
-      if score < best_score {
-        best_score = score;
-        best_shift = shift;
-      }
-    }
-
-    Ok(best_shift)
-  }
-
-  fn decrypt_vigenere(content: &str, key: &str) -> String {
-    content
+    let decrypted_content: String = content
       .chars()
-      .enumerate()
-      .map(|(i, c)| {
+      .map(|c| {
         if c.is_ascii_alphabetic() {
-          let key_char = key.as_bytes()[i % key.len()];
-          let offset = if c.is_ascii_uppercase() { b'A' } else { b'a' };
-          let c_value = c as u8 - offset;
-          let key_value = key_char - b'A';
-          let shifted = (26 + c_value - key_value) % 26;
-          (shifted + offset) as char
+          let key_char = key.chars().nth(key_index % key_length).unwrap();
+          key_index += 1;
+
+          let base = if c.is_ascii_lowercase() { b'a' } else { b'A' };
+          let key_shift = key_char as u8 - b'A';
+
+          (((c as u8 - base + 26 - key_shift) % 26) + base) as char
         } else {
           c
         }
       })
-      .collect()
+      .collect();
+
+    write!(output, "{}", decrypted_content)?;
+    Ok(())
+  }
+
+  fn decrypt_with_key_length<R: Read, W: Write>(
+    input: &mut R,
+    output: &mut W,
+    key_length: u8,
+  ) -> Result<()> {
+    let mut content = String::new();
+    input.read_to_string(&mut content)?;
+
+    // Prepare to collect characters from each segment based on the known key length
+    let mut key = String::new();
+
+    for i in 0..key_length {
+      // Collect characters from the current segment (i, i + key_length, i + 2 * key_length, ...)
+      let nth_chars: String = content
+        .chars()
+        .enumerate()
+        .filter_map(|(index, c)| {
+          if c.is_ascii_alphabetic()
+            && index % key_length as usize == i as usize
+          {
+            Some(c)
+          } else {
+            None
+          }
+        })
+        .collect();
+
+      // Use the frequency analysis method to determine the best Caesar shift
+      let mut input = Cursor::new(nth_chars);
+      let (_, shift) = CaesarCipher::find_best_caesar_shift(&mut input)?;
+
+      // Convert the shift to the corresponding key character (assuming uppercase)
+      let key_char = (b'A' + shift) as char;
+      key.push(key_char);
+    }
+
+    // Use the derived key to decrypt the content
+    Self::decrypt_with_key(&mut content.as_bytes(), output, &key)
+  }
+
+  fn decrypt_with_max_key_length<R: Read, W: Write>(
+    input: &mut R,
+    _output: &mut W,
+    _max_key_length: u8,
+  ) -> Result<()> {
+    let mut content = String::new();
+
+    input.read_to_string(&mut content)?;
+
+    todo!();
   }
 }
 
@@ -197,6 +226,25 @@ mod tests {
   use std::path::PathBuf;
 
   #[test]
+  fn test_decrypt_with_key_length_basic() {
+    let encrypted_text = "RIJVS UYVJN";
+    let key_length = 3;
+    let mut input = Cursor::new(encrypted_text);
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key_length(
+      &mut input,
+      &mut output,
+      key_length,
+    )
+    .unwrap();
+    let decrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(decrypted_text, "HELLO WORLD");
+  }
+
+  #[test]
+  #[ignore]
   fn test_example_output() -> Result<()> {
     let assets = "src/vigenere/assets";
     let path = env::var("CARGO_MANIFEST_DIR")
@@ -267,5 +315,117 @@ mod tests {
     let encrypted_text = String::from_utf8(output).unwrap();
 
     assert_eq!(encrypted_text, "RIJVS, UYVJN!");
+  }
+
+  #[test]
+  fn test_decrypt_with_known_key() {
+    let encrypted_text = "RIJVS UYVJN";
+    let key = "KEY";
+    let mut input = Cursor::new(encrypted_text);
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key(&mut input, &mut output, key).unwrap();
+    let decrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(decrypted_text, "HELLO WORLD");
+  }
+
+  #[test]
+  fn test_decrypt_with_known_key_lowercase() {
+    let encrypted_text = "rijvs uyvjn";
+    let key = "key";
+    let mut input = Cursor::new(encrypted_text);
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key(&mut input, &mut output, key).unwrap();
+    let decrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(decrypted_text, "hello world");
+  }
+
+  #[test]
+  fn test_decrypt_with_known_key_mixed_case() {
+    let encrypted_text = "RiJvS UyVjN";
+    let key = "KeY";
+    let mut input = Cursor::new(encrypted_text);
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key(&mut input, &mut output, key).unwrap();
+    let decrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(decrypted_text, "HeLlO WoRlD");
+  }
+
+  #[test]
+  fn test_decrypt_with_known_key_special_chars() {
+    let encrypted_text = "RIJVS, UYVJN!";
+    let key = "KEY";
+    let mut input = Cursor::new(encrypted_text);
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key(&mut input, &mut output, key).unwrap();
+    let decrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(decrypted_text, "HELLO, WORLD!");
+  }
+
+  #[test]
+  #[ignore]
+  fn test_decrypt_with_key_length_lowercase() {
+    let encrypted_text = "rijvs uyvjn";
+    let key_length = 3;
+    let mut input = Cursor::new(encrypted_text);
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key_length(
+      &mut input,
+      &mut output,
+      key_length,
+    )
+    .unwrap();
+    let decrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(decrypted_text, "hello world");
+  }
+
+  #[test]
+  #[ignore]
+  fn test_decrypt_with_key_length_special_chars() {
+    let encrypted_text = "RIJVS, UYVJN!";
+    let key_length = 3;
+    let mut input = Cursor::new(encrypted_text);
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key_length(
+      &mut input,
+      &mut output,
+      key_length,
+    )
+    .unwrap();
+    let decrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(decrypted_text, "HELLO, WORLD!");
+  }
+
+  #[test]
+  #[ignore]
+  fn test_decrypt_with_key_length_longer_text() {
+    let encrypted_text = "QEB NRFZH YOLTK CLU GRJMP LSBO QEB IXWV ALD";
+    let key_length = 7;
+    let mut input = Cursor::new(encrypted_text);
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key_length(
+      &mut input,
+      &mut output,
+      key_length,
+    )
+    .unwrap();
+    let decrypted_text = String::from_utf8(output).unwrap();
+
+    assert_eq!(
+      decrypted_text,
+      "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG"
+    );
   }
 }

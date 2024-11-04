@@ -148,6 +148,25 @@ pub enum DecryptCipher {
   Vigenere {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
+
+    /// Specify the decryption key if known.
+    #[arg(
+      short = 'k',
+      long = "key",
+      value_name = "KEY",
+      help = "The decryption key if known"
+    )]
+    key: Option<String>,
+
+    /// Specify the key length if known.
+    #[arg(
+      short = 'n',
+      long = "key-length",
+      value_name = "KEY_LENGTH",
+      help = "The key length if known"
+    )]
+    key_length: Option<u8>,
+
     /// Specify the maximum length for the key. Defaults to 20.
     #[arg(
       short = 'l',
