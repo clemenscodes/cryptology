@@ -9,7 +9,7 @@ use monoalphabetic_substitution::MonoalphabeticSubstition;
 use std::fs::File;
 use std::io::{self, Read, Result, Write};
 use std::path::PathBuf;
-use vigenere::{VigenereConfig, VigenereCypher};
+use vigenere::VigenereCipher;
 
 use frequency_analysis::FrequencyAnalyzer;
 
@@ -81,58 +81,74 @@ pub enum Command {
   ///
   /// Input can be provided from a file or standard input, and
   /// output can be directed to a file or standard output.
-  #[command(
-    name = "frequency-analysis",
-    visible_aliases = ["freq", "fa"],
-    version,
-  )]
+  #[command(name = "frequency-analysis", visible_aliases = ["freq", "fa"])]
   FrequencyAnalysis {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
   },
 
-  /// Decrypt monoalphabetic substitution ciphers by frequency analysis.
-  ///
-  /// This command sorts the ciphertext letters by frequency and provides
-  /// hints based on common letter frequencies for decryption.
-  #[command(
-    name = "monoalphabetic-substitution",
-    visible_aliases = ["monosub", "ms"],
-    version,
-  )]
-  MonoalphabeticSubstitution {
-    #[command(flatten)]
-    default_args: CryptologyDefaultArgs,
+  /// Encrypt text using a specified cipher.
+  #[command(name = "encrypt", visible_aliases = ["enc", "e"])]
+  Encrypt {
+    #[command(subcommand)]
+    cipher: EncryptCipher,
   },
 
-  /// Decrypt a Caesar cipher using chi-square analysis.
-  ///
-  /// This command automatically finds the correct shift to decipher
-  /// the text based on English letter frequency.
-  #[command(
-    name = "caesar",
-    visible_aliases = ["c"],
-    version,
-  )]
+  /// Decrypt text using a specified cipher.
+  #[command(name = "decrypt", visible_aliases = ["dec", "d"])]
+  Decrypt {
+    #[command(subcommand)]
+    cipher: DecryptCipher,
+  },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum EncryptCipher {
+  /// Use the Caesar cipher for encryption.
+  #[command(name = "caesar", visible_alias = "c")]
   Caesar {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
   },
 
-  /// Decrypt a Vigenere cipher
-  ///
-  #[command(
-    name = "vigenere",
-    visible_aliases = ["v"],
-    version,
-  )]
+  /// Use the Vigenere cipher for encryption.
+  #[command(name = "vigenere", visible_alias = "v")]
   Vigenere {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
+    /// Specify the key for encryption.
+    #[arg(
+      short = 'k',
+      long = "key",
+      value_name = "KEY",
+      help = "Encryption key"
+    )]
+    key: String,
+  },
+}
 
-    /// Path to the output file for saving results.
-    ///
-    /// If not provided, outputs to standard output.
+#[derive(Debug, Subcommand)]
+pub enum DecryptCipher {
+  /// Use monoalphabetic substitution cipher for decryption.
+  #[command(name = "monoalphabetic-substitution", visible_aliases = ["monosub", "ms"])]
+  MonoalphabeticSubstitution {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+  },
+
+  /// Use the Caesar cipher for decryption.
+  #[command(name = "caesar", visible_alias = "c")]
+  Caesar {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+  },
+
+  /// Use the Vigenere cipher for decryption.
+  #[command(name = "vigenere", visible_alias = "v")]
+  Vigenere {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+    /// Specify the maximum length for the key. Defaults to 20.
     #[arg(
       short = 'l',
       long = "max-key-length",
@@ -147,27 +163,53 @@ impl Command {
   pub fn execute(&self) -> Result<()> {
     match self {
       Command::FrequencyAnalysis { default_args } => {
-        let (mut input, mut output) = Self::get_files(default_args);
+        let (mut input, mut output) = Command::get_files(default_args);
         FrequencyAnalyzer::analyze(&mut input, &mut output)?;
         Ok(())
       }
-      Command::MonoalphabeticSubstitution { default_args } => {
-        let (mut input, mut output) = Self::get_files(default_args);
-        MonoalphabeticSubstition::analyze(&mut input, &mut output)?;
-        Ok(())
+      Command::Encrypt { cipher } => cipher.execute(),
+      Command::Decrypt { cipher } => cipher.execute(),
+    }
+  }
+}
+
+impl EncryptCipher {
+  pub fn execute(&self) -> Result<()> {
+    match self {
+      EncryptCipher::Caesar { .. } => {
+        todo!()
       }
-      Command::Caesar { default_args } => {
-        let (mut input, mut output) = Self::get_files(default_args);
-        CaesarCipher::decrypt(&mut input, &mut output)
-      }
-      Command::Vigenere { default_args, .. } => {
-        let (mut input, mut output) = Self::get_files(default_args);
-        let config: VigenereConfig = self.into();
-        VigenereCypher::decrypt(&mut input, &mut output, config)
+      EncryptCipher::Vigenere { default_args, .. } => {
+        let (mut input, mut output) = Command::get_files(default_args);
+        let config = self.into();
+        VigenereCipher::encrypt(&mut input, &mut output, config)
       }
     }
   }
+}
 
+impl DecryptCipher {
+  pub fn execute(&self) -> Result<()> {
+    match self {
+      DecryptCipher::MonoalphabeticSubstitution { default_args } => {
+        let (mut input, mut output) = Command::get_files(default_args);
+        MonoalphabeticSubstition::analyze(&mut input, &mut output)?;
+        Ok(())
+      }
+      DecryptCipher::Caesar { default_args } => {
+        let (mut input, mut output) = Command::get_files(default_args);
+        CaesarCipher::decrypt(&mut input, &mut output)
+      }
+      DecryptCipher::Vigenere { default_args, .. } => {
+        let (mut input, mut output) = Command::get_files(default_args);
+        let config = self.into();
+        VigenereCipher::decrypt(&mut input, &mut output, config)
+      }
+    }
+  }
+}
+
+impl Command {
   fn get_files(
     default_args: &CryptologyDefaultArgs,
   ) -> (Box<dyn Read>, Box<dyn Write>) {
@@ -195,10 +237,10 @@ impl Command {
   }
 }
 
-pub trait Decrypt<T> {
-  fn decrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<T>;
+pub trait Decrypt {
+  fn decrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()>;
 }
 
-pub trait Encrypt<T> {
-  fn encrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<T>;
+pub trait Encrypt {
+  fn encrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()>;
 }

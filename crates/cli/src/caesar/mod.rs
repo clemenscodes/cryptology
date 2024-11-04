@@ -4,7 +4,7 @@ use crate::{frequency_analysis::FrequencyAnalyzer, Decrypt};
 
 pub struct CaesarCipher;
 
-impl Decrypt<()> for CaesarCipher {
+impl Decrypt for CaesarCipher {
   fn decrypt<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;

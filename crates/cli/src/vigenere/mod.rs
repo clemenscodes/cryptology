@@ -1,14 +1,15 @@
 use std::io::{Cursor, Read, Result, Write};
 
 use crate::{
-  caesar::CaesarCipher, frequency_analysis::FrequencyAnalyzer, Command,
+  caesar::CaesarCipher, frequency_analysis::FrequencyAnalyzer, DecryptCipher,
+  EncryptCipher,
 };
 
-pub struct VigenereConfig {
+pub struct VigenereDecryptConfig {
   max_key_length: u8,
 }
 
-impl VigenereConfig {
+impl VigenereDecryptConfig {
   pub fn new(max_key_length: Option<u8>) -> Self {
     Self {
       max_key_length: max_key_length.unwrap_or(20),
@@ -16,30 +17,72 @@ impl VigenereConfig {
   }
 }
 
-impl Default for VigenereConfig {
+impl Default for VigenereDecryptConfig {
   fn default() -> Self {
     Self { max_key_length: 20 }
   }
 }
 
-impl From<&Command> for VigenereConfig {
-  fn from(value: &Command) -> Self {
+impl From<&DecryptCipher> for VigenereDecryptConfig {
+  fn from(value: &DecryptCipher) -> Self {
     match value {
-      Command::Vigenere { max_key_length, .. } => {
-        VigenereConfig::new(*max_key_length)
+      DecryptCipher::Vigenere { max_key_length, .. } => {
+        VigenereDecryptConfig::new(*max_key_length)
       }
-      _ => VigenereConfig::default(),
+      _ => VigenereDecryptConfig::default(),
     }
   }
 }
 
-pub struct VigenereCypher;
+pub struct VigenereEncryptConfig {
+  key: String,
+}
 
-impl VigenereCypher {
+impl VigenereEncryptConfig {
+  pub fn new(key: &str) -> Self {
+    Self {
+      key: key.to_string(),
+    }
+  }
+}
+
+impl Default for VigenereEncryptConfig {
+  fn default() -> Self {
+    Self {
+      key: String::from("key"),
+    }
+  }
+}
+
+impl From<&EncryptCipher> for VigenereEncryptConfig {
+  fn from(value: &EncryptCipher) -> Self {
+    match value {
+      EncryptCipher::Vigenere { key, .. } => VigenereEncryptConfig::new(key),
+      _ => VigenereEncryptConfig::default(),
+    }
+  }
+}
+
+pub struct VigenereCipher;
+
+impl VigenereCipher {
+  pub fn encrypt<R: Read, W: Write>(
+    input: &mut R,
+    output: &mut W,
+    config: VigenereEncryptConfig,
+  ) -> Result<()> {
+    let mut content = String::new();
+
+    input.read_to_string(&mut content)?;
+
+    writeln!(output, "{}", config.key)?;
+    Ok(())
+  }
+
   pub fn decrypt<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
-    config: VigenereConfig,
+    config: VigenereDecryptConfig,
   ) -> Result<()> {
     let mut content = String::new();
 
@@ -150,9 +193,9 @@ mod tests {
 
     let mut input_file = File::open(&input_path)?;
     let mut output_buffer = Vec::new();
-    let config = VigenereConfig::default();
+    let config = VigenereDecryptConfig::default();
 
-    VigenereCypher::decrypt(&mut input_file, &mut output_buffer, config)?;
+    VigenereCipher::decrypt(&mut input_file, &mut output_buffer, config)?;
 
     let mut expected_output = String::new();
     File::open(&output_path)?.read_to_string(&mut expected_output)?;
