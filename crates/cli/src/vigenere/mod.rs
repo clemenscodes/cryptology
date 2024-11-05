@@ -516,8 +516,8 @@ mod tests {
           .join(assets)
       });
 
-    let input_path = path.join("input.txt");
-    let output_path = path.join("output.txt");
+    let input_path = path.join("input1.txt");
+    let output_path = path.join("output1.txt");
 
     let mut input_file = File::open(&input_path).unwrap();
 
