@@ -1,8 +1,6 @@
 use std::io::{Cursor, Read, Result, Write};
 
-use crate::{
-  frequency_analysis::bigrams::BigramFrequency, DecryptCipher, EncryptCipher,
-};
+use crate::{DecryptCipher, EncryptCipher};
 
 pub struct VigenereDecryptConfig {
   pub key: Option<String>,
@@ -180,39 +178,6 @@ impl VigenereCipher {
     caesars
   }
 
-  pub fn key_pairs(segments: Vec<String>, key_length: u8) -> Vec<String> {
-    segments
-      .iter()
-      .map(|segment| segment.chars().take((key_length - 1).into()).collect())
-      .collect()
-  }
-
-  fn generate_keys(key_length: usize) -> Vec<String> {
-    let mut keys = Vec::new();
-    let mut key = vec![b'A'; key_length - 1];
-
-    loop {
-      keys.push(String::from_utf8(key.clone()).unwrap());
-
-      let mut index = key_length - 1;
-      while index > 0 {
-        index -= 1;
-        if key[index] < b'Z' {
-          key[index] += 1;
-          break;
-        } else {
-          key[index] = b'A';
-        }
-      }
-
-      if index == 0 && key[0] == b'A' {
-        break;
-      }
-    }
-
-    keys
-  }
-
   fn decrypt_with_key<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
@@ -246,34 +211,18 @@ impl VigenereCipher {
     Ok(())
   }
 
-  fn text_pairs<R: Read>(input: &mut R, key_length: u8) -> Result<Vec<String>> {
-    let mut content = String::new();
-
-    input.read_to_string(&mut content)?;
-
-    let mut buf = Cursor::new(content.into_bytes());
-
-    let segments = Self::segment_text(&mut buf, key_length)?;
-    let key_pairs = Self::key_pairs(segments, key_length);
-
-    Ok(key_pairs)
-  }
-
   fn decrypt_with_key_length<R: Read, W: Write>(
     input: &mut R,
-    output: &mut W,
-    key_length: u8,
+    _output: &mut W,
+    _key_length: u8,
   ) -> Result<()> {
     let mut content = String::new();
 
     input.read_to_string(&mut content)?;
 
-    let mut in_buf = Cursor::new(content.into_bytes());
+    let mut _buf = Cursor::new(content.into_bytes());
 
-    let key_pairs = Self::text_pairs(&mut in_buf, key_length)?;
-
-    writeln!(output, "{key_pairs:#?}")?;
-    Ok(())
+    todo!();
   }
 
   fn decrypt_with_max_key_length<R: Read, W: Write>(
@@ -287,29 +236,13 @@ impl VigenereCipher {
 
     todo!();
   }
-
-  fn bigram_score(decrypted_text: &str, bigram_freq: &BigramFrequency) -> u64 {
-    let mut score: u64 = 0;
-    let chars: Vec<char> = decrypted_text.chars().collect();
-
-    for i in 0..chars.len() - 1 {
-      let bigram = [chars[i], chars[i + 1]];
-      if let Some(&freq) = bigram_freq.get(&bigram) {
-        score += freq;
-      }
-    }
-
-    score
-  }
 }
 
 #[cfg(test)]
 mod tests {
   use crate::caesar::CaesarCipher;
-  use crate::frequency_analysis::bigrams::BIGRAMS;
 
   use super::*;
-  use std::collections::BTreeMap;
   use std::env;
   use std::fs::File;
   use std::io::Cursor;
@@ -446,19 +379,6 @@ mod tests {
   }
 
   #[test]
-  fn test_key_pairs() {
-    let mut text = Cursor::new("VIGENERE");
-    let key_length = 3;
-    let segments = VigenereCipher::segment_text(&mut text, key_length).unwrap();
-    let key_pairs = VigenereCipher::key_pairs(segments, key_length);
-
-    assert_eq!(
-      key_pairs,
-      vec!["VI".to_string(), "EN".to_string(), "RE".to_string()]
-    );
-  }
-
-  #[test]
   fn test_create_caesars() {
     let mut text = Cursor::new("VIGENERE");
     let key_length = 3;
@@ -474,7 +394,7 @@ mod tests {
   #[test]
   fn test_decrypt_caesars() {
     let input = "VIGENERE";
-    let mut text = Cursor::new(input.clone().as_bytes());
+    let mut text = Cursor::new(input.as_bytes());
 
     let key_length = 3;
     let segments = VigenereCipher::segment_text(&mut text, key_length).unwrap();
@@ -628,78 +548,6 @@ mod tests {
       .unwrap();
 
     assert_eq!(plaintext, expected_output);
-  }
-
-  #[test]
-  fn test_text_pairs() {
-    let mut text = Cursor::new("VIGENERE");
-    let key_length = 3;
-    let key_pairs = VigenereCipher::text_pairs(&mut text, key_length).unwrap();
-
-    assert_eq!(
-      key_pairs,
-      vec!["VI".to_string(), "EN".to_string(), "RE".to_string()]
-    );
-  }
-
-  #[test]
-  fn test_generate_keys_length() {
-    let key_length = 3;
-    let keys = VigenereCipher::generate_keys(key_length);
-    let mut expected = Vec::new();
-    for first in b'A'..=b'Z' {
-      for second in b'A'..=b'Z' {
-        expected.push(format!("{}{}", first as char, second as char));
-      }
-    }
-    assert_eq!(keys, expected);
-  }
-
-  #[test]
-  fn test_generate_keys_length_4() {
-    let key_length: usize = 4;
-    let keys = VigenereCipher::generate_keys(key_length);
-    assert_eq!(keys.len(), 26_u32.pow((key_length - 1) as u32) as usize); // There should be 26^3 keys for key length 4
-  }
-
-  #[test]
-  fn test_decrypt_with_bigram_freqs() {
-    let mut text = Cursor::new("VIGENERE");
-
-    let key_length = 3;
-    let pairs = VigenereCipher::text_pairs(&mut text, key_length).unwrap();
-    let keys = VigenereCipher::generate_keys(key_length as usize);
-
-    let mut key_scores: BTreeMap<String, u64> = BTreeMap::new();
-
-    println!("{pairs:#?}");
-
-    for key in &keys {
-      let mut key_score = 0;
-
-      for pair in &pairs {
-        let mut input = Cursor::new(pair.clone().into_bytes());
-        let mut output = Vec::new();
-        VigenereCipher::decrypt_with_key(&mut input, &mut output, key).unwrap();
-
-        let plaintext = String::from_utf8(output).unwrap();
-
-        let score = VigenereCipher::bigram_score(&plaintext, &BIGRAMS);
-
-        key_score += score;
-      }
-
-      key_scores.insert(key.to_string(), key_score);
-    }
-
-    let mut scores: Vec<_> = key_scores.iter().collect();
-
-    scores.sort_by(|a, b| b.1.cmp(a.1));
-
-    // Print the top 5 keys and their scores
-    for (key, score) in scores.iter().take(5) {
-      println!("Key: {}, Score: {}", key, score);
-    }
   }
 
   #[test]

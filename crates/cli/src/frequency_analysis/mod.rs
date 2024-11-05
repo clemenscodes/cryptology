@@ -1,5 +1,4 @@
 pub mod frequencies;
-pub mod bigrams;
 
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::io::{Read, Result, Write};
