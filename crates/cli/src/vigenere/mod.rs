@@ -132,7 +132,83 @@ impl VigenereCipher {
     }
   }
 
-  pub fn segment_text<R: Read>(
+  fn decrypt_with_key<R: Read, W: Write>(
+    input: &mut R,
+    output: &mut W,
+    key: &str,
+  ) -> Result<()> {
+    let mut content = String::new();
+    input.read_to_string(&mut content)?;
+
+    let key = key.to_uppercase();
+    let key_length = key.len();
+    let mut key_index = 0;
+
+    let decipher: String = content
+      .chars()
+      .map(|c| {
+        if c.is_ascii_alphabetic() {
+          let key_char = key.chars().nth(key_index % key_length).unwrap();
+          key_index += 1;
+
+          let base = if c.is_ascii_lowercase() { b'a' } else { b'A' };
+          let key_shift = key_char as u8 - b'A';
+
+          (((c as u8 - base + 26 - key_shift) % 26) + base) as char
+        } else {
+          c
+        }
+      })
+      .collect();
+
+    write!(output, "{decipher}")?;
+    Ok(())
+  }
+  fn decrypt_with_key_length<R: Read, W: Write>(
+    input: &mut R,
+    output: &mut W,
+    key_length: u8,
+  ) -> Result<()> {
+    let mut content = String::new();
+
+    input.read_to_string(&mut content)?;
+
+    let mut shifts: Vec<u8> = Vec::new();
+    let mut buf = Self::get_readable(&content);
+    let segments = VigenereCipher::segment_text(&mut buf, key_length)?;
+    let caesars = VigenereCipher::create_caesars(segments, key_length);
+
+    for caesar in &caesars {
+      let mut buf = Self::get_readable(caesar);
+      let (_, shift) = CaesarCipher::find_best_caesar_shift(&mut buf)?;
+      shifts.push(shift);
+    }
+
+    let mut input = Self::get_readable(&content);
+    let mut buf = Vec::new();
+    let key = Self::derive_key(shifts);
+
+    VigenereCipher::decrypt_with_key(&mut input, &mut buf, &key)?;
+
+    let plaintext = String::from_utf8(buf).unwrap();
+
+    write!(output, "{plaintext}")?;
+    Ok(())
+  }
+
+  fn decrypt_with_max_key_length<R: Read, W: Write>(
+    input: &mut R,
+    _output: &mut W,
+    _max_key_length: u8,
+  ) -> Result<()> {
+    let mut content = String::new();
+
+    input.read_to_string(&mut content)?;
+
+    todo!();
+  }
+
+  fn segment_text<R: Read>(
     input: &mut R,
     key_length: u8,
   ) -> Result<Vec<String>> {
@@ -166,7 +242,7 @@ impl VigenereCipher {
     Ok(chunks)
   }
 
-  pub fn create_caesars(chunks: Vec<String>, key_length: u8) -> Vec<String> {
+  fn create_caesars(chunks: Vec<String>, key_length: u8) -> Vec<String> {
     let mut caesars: Vec<String> = vec![String::new(); key_length as usize];
 
     for chunk in chunks {
@@ -178,90 +254,12 @@ impl VigenereCipher {
     caesars
   }
 
-  fn decrypt_with_key<R: Read, W: Write>(
-    input: &mut R,
-    output: &mut W,
-    key: &str,
-  ) -> Result<()> {
-    let mut content = String::new();
-    input.read_to_string(&mut content)?;
-
-    let key = key.to_uppercase();
-    let mut key_index = 0;
-    let key_length = key.len();
-
-    let decipher: String = content
-      .chars()
-      .map(|c| {
-        if c.is_ascii_alphabetic() {
-          let key_char = key.chars().nth(key_index % key_length).unwrap();
-          key_index += 1;
-
-          let base = if c.is_ascii_lowercase() { b'a' } else { b'A' };
-          let key_shift = key_char as u8 - b'A';
-
-          (((c as u8 - base + 26 - key_shift) % 26) + base) as char
-        } else {
-          c
-        }
-      })
-      .collect();
-
-    write!(output, "{decipher}")?;
-    Ok(())
+  fn get_readable(input: &str) -> Cursor<Vec<u8>> {
+    Cursor::new(input.as_bytes().to_vec())
   }
 
-  fn decrypt_with_key_length<R: Read, W: Write>(
-    input: &mut R,
-    output: &mut W,
-    key_length: u8,
-  ) -> Result<()> {
-    let mut content = String::new();
-
-    input.read_to_string(&mut content)?;
-
-    let mut buf = Cursor::new(content.clone().into_bytes());
-
-    let segments = VigenereCipher::segment_text(&mut buf, key_length).unwrap();
-
-    let caesars = VigenereCipher::create_caesars(segments, key_length);
-
-    let mut shifts: Vec<u8> = Vec::new();
-
-    for caesar in &caesars {
-      let mut buf = Cursor::new(caesar.clone().into_bytes());
-      let (_, shift) = CaesarCipher::find_best_caesar_shift(&mut buf).unwrap();
-      shifts.push(shift);
-    }
-
-    let key: String =
-      shifts.iter().map(|&shift| (b'A' + shift) as char).collect();
-
-    let mut buf = Vec::new();
-
-    VigenereCipher::decrypt_with_key(
-      &mut Cursor::new(content.into_bytes()),
-      &mut buf,
-      &key,
-    )
-    .unwrap();
-
-    let plaintext = String::from_utf8(buf).unwrap();
-
-    write!(output, "{plaintext}")?;
-    Ok(())
-  }
-
-  fn decrypt_with_max_key_length<R: Read, W: Write>(
-    input: &mut R,
-    _output: &mut W,
-    _max_key_length: u8,
-  ) -> Result<()> {
-    let mut content = String::new();
-
-    input.read_to_string(&mut content)?;
-
-    todo!();
+  fn derive_key(shifts: Vec<u8>) -> String {
+    shifts.iter().map(|&shift| (b'A' + shift) as char).collect()
   }
 }
 
@@ -298,37 +296,18 @@ mod tests {
 
     let key_length = 16;
 
-    let segments = VigenereCipher::segment_text(
-      &mut Cursor::new(input.clone().into_bytes()),
+    let mut expected_output = String::new();
+
+    let mut buf = Vec::new();
+
+    VigenereCipher::decrypt_with_key_length(
+      &mut Cursor::new(input.into_bytes()),
+      &mut buf,
       key_length,
     )
     .unwrap();
 
-    let caesars = VigenereCipher::create_caesars(segments, key_length);
-
-    let mut shifts: Vec<u8> = Vec::new();
-
-    for caesar in &caesars {
-      let mut buf = Cursor::new(caesar.clone().into_bytes());
-      let (_, shift) = CaesarCipher::find_best_caesar_shift(&mut buf).unwrap();
-      shifts.push(shift);
-    }
-
-    let key: String =
-      shifts.iter().map(|&shift| (b'A' + shift) as char).collect();
-
-    let mut output = Vec::new();
-
-    VigenereCipher::decrypt_with_key(
-      &mut Cursor::new(input.into_bytes()),
-      &mut output,
-      &key,
-    )
-    .unwrap();
-
-    let plaintext = String::from_utf8(output).unwrap();
-
-    let mut expected_output = String::new();
+    let plaintext = String::from_utf8(buf).unwrap();
 
     File::open(&output_path)
       .unwrap()
@@ -361,37 +340,18 @@ mod tests {
 
     let key_length = 3;
 
-    let segments = VigenereCipher::segment_text(
-      &mut Cursor::new(input.clone().into_bytes()),
+    let mut expected_output = String::new();
+
+    let mut buf = Vec::new();
+
+    VigenereCipher::decrypt_with_key_length(
+      &mut Cursor::new(input.into_bytes()),
+      &mut buf,
       key_length,
     )
     .unwrap();
 
-    let caesars = VigenereCipher::create_caesars(segments, key_length);
-
-    let mut shifts: Vec<u8> = Vec::new();
-
-    for caesar in &caesars {
-      let mut buf = Cursor::new(caesar.clone().into_bytes());
-      let (_, shift) = CaesarCipher::find_best_caesar_shift(&mut buf).unwrap();
-      shifts.push(shift);
-    }
-
-    let key: String =
-      shifts.iter().map(|&shift| (b'A' + shift) as char).collect();
-
-    let mut output = Vec::new();
-
-    VigenereCipher::decrypt_with_key(
-      &mut Cursor::new(input.into_bytes()),
-      &mut output,
-      &key,
-    )
-    .unwrap();
-
-    let plaintext = String::from_utf8(output).unwrap();
-
-    let mut expected_output = String::new();
+    let plaintext = String::from_utf8(buf).unwrap();
 
     File::open(&output_path)
       .unwrap()
