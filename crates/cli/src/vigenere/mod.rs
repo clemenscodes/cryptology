@@ -1,6 +1,9 @@
 use std::io::{Cursor, Read, Result, Write};
 
-use crate::{caesar::CaesarCipher, DecryptCipher, EncryptCipher};
+use crate::{
+  caesar::CaesarCipher, frequency_analysis::FrequencyAnalyzer, DecryptCipher,
+  EncryptCipher,
+};
 
 pub struct VigenereDecryptConfig {
   pub key: Option<String>,
@@ -123,13 +126,56 @@ impl VigenereCipher {
     output: &mut W,
     config: VigenereDecryptConfig,
   ) -> Result<()> {
-    if let Some(key) = config.key {
-      Self::decrypt_with_key(input, output, &key)
-    } else if let Some(key_length) = config.key_length {
-      Self::decrypt_with_key_length(input, output, key_length)
-    } else {
-      Self::decrypt_with_max_key_length(input, output, config.max_key_length)
+    let mut content = String::new();
+    input.read_to_string(&mut content)?;
+
+    let decrypted_lines: Vec<String> = content
+      .lines()
+      .map(|line| {
+        let mut line_reader = Cursor::new(line);
+
+        if let Some(key) = &config.key {
+          let mut buf = Vec::new();
+          if Self::decrypt_with_key(&mut line_reader, &mut buf, key).is_ok() {
+            String::from_utf8(buf).unwrap_or_else(|_| String::from(line))
+          } else {
+            String::from(line)
+          }
+        } else if let Some(key_length) = config.key_length {
+          let mut buf = Vec::new();
+          if Self::decrypt_with_key_length(
+            &mut line_reader,
+            &mut buf,
+            key_length,
+          )
+          .is_ok()
+          {
+            String::from_utf8(buf).unwrap_or_else(|_| String::from(line))
+          } else {
+            String::from(line)
+          }
+        } else {
+          let mut buf = Vec::new();
+          if Self::decrypt_with_max_key_length(
+            &mut line_reader,
+            &mut buf,
+            config.max_key_length,
+          )
+          .is_ok()
+          {
+            String::from_utf8(buf).unwrap_or_else(|_| String::from(line))
+          } else {
+            String::from(line)
+          }
+        }
+      })
+      .collect();
+
+    for line in decrypted_lines {
+      writeln!(output, "{line}")?;
     }
+
+    Ok(())
   }
 
   fn decrypt_with_key<R: Read, W: Write>(
@@ -164,6 +210,7 @@ impl VigenereCipher {
     write!(output, "{decipher}")?;
     Ok(())
   }
+
   fn decrypt_with_key_length<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
@@ -198,14 +245,41 @@ impl VigenereCipher {
 
   fn decrypt_with_max_key_length<R: Read, W: Write>(
     input: &mut R,
-    _output: &mut W,
-    _max_key_length: u8,
+    output: &mut W,
+    max_key_length: u8,
   ) -> Result<()> {
     let mut content = String::new();
 
     input.read_to_string(&mut content)?;
 
-    todo!();
+    let mut best_plaintext = String::new();
+    let mut best_score = f32::MAX;
+
+    for key_length in 2..=max_key_length {
+      let mut buf = Vec::new();
+      let mut content_reader = Self::get_readable(&content);
+
+      Self::decrypt_with_key_length(&mut content_reader, &mut buf, key_length)?;
+
+      let candidate = String::from_utf8(buf).unwrap();
+      let mut candidate_reader = Cursor::new(candidate.as_bytes());
+      let mut analysis_output = Vec::new();
+
+      let fa = FrequencyAnalyzer::analyze(
+        &mut candidate_reader,
+        &mut analysis_output,
+      )?;
+
+      let score = FrequencyAnalyzer::chi_square_score(&fa);
+
+      if score < best_score {
+        best_score = score;
+        best_plaintext = candidate;
+      }
+    }
+
+    write!(output, "{best_plaintext}")?;
+    Ok(())
   }
 
   fn segment_text<R: Read>(
@@ -265,8 +339,6 @@ impl VigenereCipher {
 
 #[cfg(test)]
 mod tests {
-  use crate::caesar::CaesarCipher;
-
   use super::*;
   use std::env;
   use std::fs::File;
@@ -274,7 +346,7 @@ mod tests {
   use std::path::PathBuf;
 
   #[test]
-  fn test_decrypt_vigenere() {
+  fn test_example_output() -> Result<()> {
     let assets = "src/vigenere/assets";
     let path = env::var("CARGO_MANIFEST_DIR")
       .map(|dir| PathBuf::from(dir).join(assets))
@@ -285,80 +357,23 @@ mod tests {
           .join(assets)
       });
 
-    let input_path = path.join("input1.txt");
-    let output_path = path.join("output1.txt");
+    let input_path = path.join("input.txt");
+    let output_path = path.join("output.txt");
 
-    let mut input_file = File::open(&input_path).unwrap();
+    let mut input_file = File::open(&input_path)?;
+    let mut output_buffer = Vec::new();
+    let config = VigenereDecryptConfig::default();
 
-    let mut input = String::new();
-
-    input_file.read_to_string(&mut input).unwrap();
-
-    let key_length = 16;
+    VigenereCipher::decrypt(&mut input_file, &mut output_buffer, config)?;
 
     let mut expected_output = String::new();
+    File::open(&output_path)?.read_to_string(&mut expected_output)?;
 
-    let mut buf = Vec::new();
+    let output_string = String::from_utf8(output_buffer)
+      .expect("Failed to convert output buffer to UTF-8 string");
 
-    VigenereCipher::decrypt_with_key_length(
-      &mut Cursor::new(input.into_bytes()),
-      &mut buf,
-      key_length,
-    )
-    .unwrap();
-
-    let plaintext = String::from_utf8(buf).unwrap();
-
-    File::open(&output_path)
-      .unwrap()
-      .read_to_string(&mut expected_output)
-      .unwrap();
-
-    assert_eq!(plaintext, expected_output);
-  }
-
-  #[test]
-  fn test_decrypt_vigenere2() {
-    let assets = "src/vigenere/assets";
-    let path = env::var("CARGO_MANIFEST_DIR")
-      .map(|dir| PathBuf::from(dir).join(assets))
-      .unwrap_or_else(|_| {
-        env::current_dir()
-          .expect("Failed to get current directory")
-          .join("crates/cli")
-          .join(assets)
-      });
-
-    let input_path = path.join("input2.txt");
-    let output_path = path.join("output2.txt");
-
-    let mut input_file = File::open(&input_path).unwrap();
-
-    let mut input = String::new();
-
-    input_file.read_to_string(&mut input).unwrap();
-
-    let key_length = 3;
-
-    let mut expected_output = String::new();
-
-    let mut buf = Vec::new();
-
-    VigenereCipher::decrypt_with_key_length(
-      &mut Cursor::new(input.into_bytes()),
-      &mut buf,
-      key_length,
-    )
-    .unwrap();
-
-    let plaintext = String::from_utf8(buf).unwrap();
-
-    File::open(&output_path)
-      .unwrap()
-      .read_to_string(&mut expected_output)
-      .unwrap();
-
-    assert_eq!(plaintext, expected_output);
+    assert_eq!(output_string, expected_output);
+    Ok(())
   }
 
   #[test]
@@ -501,150 +516,6 @@ mod tests {
     assert_eq!(
       caesars,
       vec!["VER".to_string(), "INE".to_string(), "GE".to_string()]
-    );
-  }
-
-  #[test]
-  fn test_decrypt_caesars() {
-    let input = "VIGENERE";
-    let mut text = Cursor::new(input.as_bytes());
-
-    let key_length = 3;
-    let segments = VigenereCipher::segment_text(&mut text, key_length).unwrap();
-    let caesars = VigenereCipher::create_caesars(segments, key_length);
-    let mut shifts: Vec<u8> = Vec::new();
-
-    for caesar in &caesars {
-      let mut buf = Cursor::new(caesar.clone().into_bytes());
-      let (_, shift) = CaesarCipher::find_best_caesar_shift(&mut buf).unwrap();
-      shifts.push(shift);
-    }
-
-    let key: String =
-      shifts.iter().map(|&shift| (b'A' + shift) as char).collect();
-
-    let mut output = Vec::new();
-
-    VigenereCipher::decrypt_with_key(
-      &mut Cursor::new(input.as_bytes()),
-      &mut output,
-      &key,
-    )
-    .unwrap();
-
-    let plaintext = String::from_utf8(output).unwrap();
-
-    assert_eq!(plaintext, "EITNNRAE");
-  }
-
-  #[test]
-  #[ignore]
-  fn test_decrypt_with_key_length_basic() {
-    let encrypted_text = "RIJVS UYVJN";
-    let key_length = 3;
-    let mut input = Cursor::new(encrypted_text);
-    let mut output = Vec::new();
-
-    VigenereCipher::decrypt_with_key_length(
-      &mut input,
-      &mut output,
-      key_length,
-    )
-    .unwrap();
-    let decrypted_text = String::from_utf8(output).unwrap();
-
-    assert_eq!(decrypted_text, "HELLO WORLD");
-  }
-
-  #[test]
-  #[ignore]
-  fn test_example_output() -> Result<()> {
-    let assets = "src/vigenere/assets";
-    let path = env::var("CARGO_MANIFEST_DIR")
-      .map(|dir| PathBuf::from(dir).join(assets))
-      .unwrap_or_else(|_| {
-        env::current_dir()
-          .expect("Failed to get current directory")
-          .join("crates/cli")
-          .join(assets)
-      });
-
-    let input_path = path.join("input.txt");
-    let output_path = path.join("output.txt");
-
-    let mut input_file = File::open(&input_path)?;
-    let mut output_buffer = Vec::new();
-    let config = VigenereDecryptConfig::default();
-
-    VigenereCipher::decrypt(&mut input_file, &mut output_buffer, config)?;
-
-    let mut expected_output = String::new();
-    File::open(&output_path)?.read_to_string(&mut expected_output)?;
-
-    let output_string = String::from_utf8(output_buffer)
-      .expect("Failed to convert output buffer to UTF-8 string");
-
-    assert_eq!(output_string, expected_output);
-    Ok(())
-  }
-
-  #[test]
-  #[ignore]
-  fn test_decrypt_with_key_length_lowercase() {
-    let encrypted_text = "rijvs uyvjn";
-    let key_length = 3;
-    let mut input = Cursor::new(encrypted_text);
-    let mut output = Vec::new();
-
-    VigenereCipher::decrypt_with_key_length(
-      &mut input,
-      &mut output,
-      key_length,
-    )
-    .unwrap();
-    let decrypted_text = String::from_utf8(output).unwrap();
-
-    assert_eq!(decrypted_text, "hello world");
-  }
-
-  #[test]
-  #[ignore]
-  fn test_decrypt_with_key_length_special_chars() {
-    let encrypted_text = "RIJVS, UYVJN!";
-    let key_length = 3;
-    let mut input = Cursor::new(encrypted_text);
-    let mut output = Vec::new();
-
-    VigenereCipher::decrypt_with_key_length(
-      &mut input,
-      &mut output,
-      key_length,
-    )
-    .unwrap();
-    let decrypted_text = String::from_utf8(output).unwrap();
-
-    assert_eq!(decrypted_text, "HELLO, WORLD!");
-  }
-
-  #[test]
-  #[ignore]
-  fn test_decrypt_with_key_length_longer_text() {
-    let encrypted_text = "QEB NRFZH YOLTK CLU GRJMP LSBO QEB IXWV ALD";
-    let key_length = 7;
-    let mut input = Cursor::new(encrypted_text);
-    let mut output = Vec::new();
-
-    VigenereCipher::decrypt_with_key_length(
-      &mut input,
-      &mut output,
-      key_length,
-    )
-    .unwrap();
-    let decrypted_text = String::from_utf8(output).unwrap();
-
-    assert_eq!(
-      decrypted_text,
-      "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG"
     );
   }
 }

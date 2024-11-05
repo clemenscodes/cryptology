@@ -41,9 +41,8 @@ impl FrequencyAnalyzer {
     let mut score = 0.0;
 
     for (letter, &expected_raw_count) in ENGLISH.iter() {
-      let normalized_expected_frequency = expected_raw_count as f32 / MAX;
-      let expected_count =
-        normalized_expected_frequency * fa.total_count as f32;
+      let expected_frequency = expected_raw_count as f32 / MAX;
+      let expected_count = expected_frequency * fa.total_count as f32;
 
       if expected_count > 0.0 {
         let observed_count = *fa.frequency.get(letter).unwrap_or(&0) as f32;
