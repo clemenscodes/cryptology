@@ -166,6 +166,18 @@ impl VigenereCipher {
     Ok(chunks)
   }
 
+  pub fn create_caesars(chunks: Vec<String>, key_length: u8) -> Vec<String> {
+    let mut caesars: Vec<String> = vec![String::new(); key_length as usize];
+
+    for chunk in chunks {
+      for (index, c) in chunk.chars().enumerate() {
+        caesars[index].push(c);
+      }
+    }
+
+    caesars
+  }
+
   pub fn key_pairs(segments: Vec<String>, key_length: u8) -> Vec<String> {
     segments
       .iter()
@@ -277,6 +289,8 @@ impl VigenereCipher {
 
 #[cfg(test)]
 mod tests {
+  use crate::caesar::CaesarCipher;
+
   use super::*;
   use std::env;
   use std::fs::File;
@@ -423,6 +437,38 @@ mod tests {
     assert_eq!(
       key_pairs,
       vec!["VI".to_string(), "EN".to_string(), "RE".to_string()]
+    );
+  }
+
+  #[test]
+  fn test_create_caesars() {
+    let mut text = Cursor::new("VIGENERE");
+    let key_length = 3;
+    let segments = VigenereCipher::segment_text(&mut text, key_length).unwrap();
+    let caesars = VigenereCipher::create_caesars(segments, key_length);
+
+    assert_eq!(
+      caesars,
+      vec!["VER".to_string(), "INE".to_string(), "GE".to_string()]
+    );
+  }
+
+  #[test]
+  fn test_decrypt_caesars() {
+    let mut text = Cursor::new("VIGENERE");
+    let key_length = 3;
+    let segments = VigenereCipher::segment_text(&mut text, key_length).unwrap();
+    let caesars = VigenereCipher::create_caesars(segments, key_length);
+
+    for caesar in &caesars {
+      let mut buf = Cursor::new(caesar.clone().into_bytes());
+      let (_, shift) = CaesarCipher::find_best_caesar_shift(&mut buf).unwrap();
+      println!("{caesar} -> shift: {shift}");
+    }
+
+    assert_eq!(
+      caesars,
+      vec!["VER".to_string(), "INE".to_string(), "GE".to_string()]
     );
   }
 
