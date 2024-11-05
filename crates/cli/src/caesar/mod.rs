@@ -57,8 +57,6 @@ impl CaesarCipher {
       }
     }
 
-    println!("best score: {best_score}");
-
     Ok((best_plaintext, best_shift))
   }
 

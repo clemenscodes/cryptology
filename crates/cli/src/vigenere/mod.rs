@@ -568,6 +568,69 @@ mod tests {
   }
 
   #[test]
+  fn test_decrypt_vigenere2() {
+    let assets = "src/vigenere/assets";
+    let path = env::var("CARGO_MANIFEST_DIR")
+      .map(|dir| PathBuf::from(dir).join(assets))
+      .unwrap_or_else(|_| {
+        env::current_dir()
+          .expect("Failed to get current directory")
+          .join("crates/cli")
+          .join(assets)
+      });
+
+    let input_path = path.join("input2.txt");
+    let output_path = path.join("output2.txt");
+
+    let mut input_file = File::open(&input_path).unwrap();
+
+    let mut input = String::new();
+
+    input_file.read_to_string(&mut input).unwrap();
+
+    let key_length = 3;
+
+    let segments = VigenereCipher::segment_text(
+      &mut Cursor::new(input.clone().into_bytes()),
+      key_length,
+    )
+    .unwrap();
+
+    let caesars = VigenereCipher::create_caesars(segments, key_length);
+
+    let mut shifts: Vec<u8> = Vec::new();
+
+    for caesar in &caesars {
+      let mut buf = Cursor::new(caesar.clone().into_bytes());
+      let (_, shift) = CaesarCipher::find_best_caesar_shift(&mut buf).unwrap();
+      shifts.push(shift);
+    }
+
+    let key: String =
+      shifts.iter().map(|&shift| (b'A' + shift) as char).collect();
+
+    let mut output = Vec::new();
+
+    VigenereCipher::decrypt_with_key(
+      &mut Cursor::new(input.into_bytes()),
+      &mut output,
+      &key,
+    )
+    .unwrap();
+
+    let plaintext = String::from_utf8(output).unwrap();
+
+    let mut expected_output = String::new();
+
+    File::open(&output_path)
+      .unwrap()
+      .read_to_string(&mut expected_output)
+      .unwrap();
+
+    assert_eq!(plaintext, expected_output);
+  }
+
+  #[test]
   fn test_text_pairs() {
     let mut text = Cursor::new("VIGENERE");
     let key_length = 3;
