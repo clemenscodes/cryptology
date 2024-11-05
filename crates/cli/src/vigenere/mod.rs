@@ -1,6 +1,8 @@
 use std::io::{Cursor, Read, Result, Write};
 
-use crate::{DecryptCipher, EncryptCipher};
+use crate::{
+  frequency_analysis::bigrams::BigramFrequency, DecryptCipher, EncryptCipher,
+};
 
 pub struct VigenereDecryptConfig {
   pub key: Option<String>,
@@ -285,13 +287,29 @@ impl VigenereCipher {
 
     todo!();
   }
+
+  fn bigram_score(decrypted_text: &str, bigram_freq: &BigramFrequency) -> u64 {
+    let mut score: u64 = 0;
+    let chars: Vec<char> = decrypted_text.chars().collect();
+
+    for i in 0..chars.len() - 1 {
+      let bigram = [chars[i], chars[i + 1]];
+      if let Some(&freq) = bigram_freq.get(&bigram) {
+        score += freq;
+      }
+    }
+
+    score
+  }
 }
 
 #[cfg(test)]
 mod tests {
   use crate::caesar::CaesarCipher;
+  use crate::frequency_analysis::bigrams::BIGRAMS;
 
   use super::*;
+  use std::collections::BTreeMap;
   use std::env;
   use std::fs::File;
   use std::io::Cursor;
@@ -502,6 +520,46 @@ mod tests {
     let key_length: usize = 4;
     let keys = VigenereCipher::generate_keys(key_length);
     assert_eq!(keys.len(), 26_u32.pow((key_length - 1) as u32) as usize); // There should be 26^3 keys for key length 4
+  }
+
+  #[test]
+  fn test_decrypt_with_bigram_freqs() {
+    let mut text = Cursor::new("VIGENERE");
+
+    let key_length = 3;
+    let pairs = VigenereCipher::text_pairs(&mut text, key_length).unwrap();
+    let keys = VigenereCipher::generate_keys(key_length as usize);
+
+    let mut key_scores: BTreeMap<String, u64> = BTreeMap::new();
+
+    println!("{pairs:#?}");
+
+    for key in &keys {
+      let mut key_score = 0;
+
+      for pair in &pairs {
+        let mut input = Cursor::new(pair.clone().into_bytes());
+        let mut output = Vec::new();
+        VigenereCipher::decrypt_with_key(&mut input, &mut output, key).unwrap();
+
+        let decrypted_text = String::from_utf8(output).unwrap();
+
+        let score = VigenereCipher::bigram_score(&decrypted_text, &BIGRAMS);
+
+        key_score += score;
+      }
+
+      key_scores.insert(key.to_string(), key_score);
+    }
+
+    let mut scores: Vec<_> = key_scores.iter().collect();
+
+    scores.sort_by(|a, b| b.1.cmp(a.1));
+
+    // Print the top 5 keys and their scores
+    for (key, score) in scores.iter().take(5) {
+      println!("Key: {}, Score: {}", key, score);
+    }
   }
 
   #[test]
