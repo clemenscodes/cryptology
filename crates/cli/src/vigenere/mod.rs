@@ -1,4 +1,9 @@
-use std::io::{Cursor, Read, Result, Write};
+use rayon::prelude::*;
+
+use std::{
+  io::{Cursor, Read, Result, Write},
+  sync::{Arc, Mutex},
+};
 
 use crate::{
   caesar::CaesarCipher, frequency_analysis::FrequencyAnalyzer, DecryptCipher,
@@ -249,35 +254,44 @@ impl VigenereCipher {
     max_key_length: u8,
   ) -> Result<()> {
     let mut content = String::new();
-
     input.read_to_string(&mut content)?;
 
-    let mut best_plaintext = String::new();
-    let mut best_score = f32::MAX;
+    let content = Arc::new(content);
+    let best_result = Arc::new(Mutex::new((String::new(), f32::MAX)));
 
-    for key_length in 2..=max_key_length {
+    (2..=max_key_length).into_par_iter().for_each(|key_length| {
+      let mut shifts = vec![0u8; key_length as usize];
+      let mut input = Self::get_readable(&content);
+      let segments = Self::segment_text(&mut input, key_length).unwrap();
+      let caesars = VigenereCipher::create_caesars(segments, key_length);
+
+      caesars.into_iter().enumerate().for_each(|(index, caesar)| {
+        let mut buf = Self::get_readable(&caesar);
+        let (_, s) = CaesarCipher::find_best_caesar_shift(&mut buf).unwrap();
+        shifts[index] = s;
+      });
+
+      let key = Self::derive_key(shifts);
+
       let mut buf = Vec::new();
-      let mut content_reader = Self::get_readable(&content);
-
-      Self::decrypt_with_key_length(&mut content_reader, &mut buf, key_length)?;
+      let mut input = Self::get_readable(&content);
+      Self::decrypt_with_key(&mut input, &mut buf, &key).unwrap();
 
       let candidate = String::from_utf8(buf).unwrap();
-      let mut candidate_reader = Cursor::new(candidate.as_bytes());
-      let mut analysis_output = Vec::new();
+      let mut input = Self::get_readable(&candidate);
+      let mut output = Vec::new();
 
-      let fa = FrequencyAnalyzer::analyze(
-        &mut candidate_reader,
-        &mut analysis_output,
-      )?;
+      if let Ok(fa) = FrequencyAnalyzer::analyze(&mut input, &mut output) {
+        let score = FrequencyAnalyzer::chi_square_score(&fa);
 
-      let score = FrequencyAnalyzer::chi_square_score(&fa);
-
-      if score < best_score {
-        best_score = score;
-        best_plaintext = candidate;
+        let mut best_result = best_result.lock().unwrap();
+        if score < best_result.1 {
+          *best_result = (candidate, score);
+        }
       }
-    }
+    });
 
+    let best_plaintext = best_result.lock().unwrap().0.clone();
     write!(output, "{best_plaintext}")?;
     Ok(())
   }

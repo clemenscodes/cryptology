@@ -1,4 +1,9 @@
-use std::io::{Cursor, Read, Result, Write};
+use rayon::prelude::*;
+
+use std::{
+  io::{Cursor, Read, Result, Write},
+  sync::{Arc, Mutex},
+};
 
 use crate::frequency_analysis::FrequencyAnalyzer;
 
@@ -34,30 +39,39 @@ impl CaesarCipher {
   pub fn find_best_caesar_shift<R: Read>(
     input: &mut R,
   ) -> Result<(String, u8)> {
-    let mut best_score = f32::MAX;
-    let mut best_plaintext = String::new();
-    let mut best_shift = 0;
+    let best_score = Arc::new(Mutex::new(f32::MAX));
+    let best_plaintext = Arc::new(Mutex::new(String::new()));
+    let best_shift = Arc::new(Mutex::new(0u8));
     let mut buf = String::new();
 
     input.read_to_string(&mut buf)?;
 
-    for shift in 0..26 {
+    (0..26).into_par_iter().for_each(|shift| {
       let copy = buf.clone();
       let mut cursor = Cursor::new(copy.as_bytes());
-      let candidate = Self::decrypt_caesar_cipher(&mut cursor, shift)?;
+      let candidate = Self::decrypt_caesar_cipher(&mut cursor, shift).unwrap();
       let mut buf = Cursor::new(candidate.as_bytes());
       let mut output = Vec::new();
-      let fa = FrequencyAnalyzer::analyze(&mut buf, &mut output)?;
+      let fa = FrequencyAnalyzer::analyze(&mut buf, &mut output).unwrap();
       let score = FrequencyAnalyzer::chi_square_score(&fa);
 
-      if score < best_score {
-        best_score = score;
-        best_plaintext = candidate;
-        best_shift = shift;
+      let mut best_score_guard = best_score.lock().unwrap();
+      if score < *best_score_guard {
+        *best_score_guard = score;
+        *best_plaintext.lock().unwrap() = candidate;
+        *best_shift.lock().unwrap() = shift;
       }
-    }
+    });
 
-    Ok((best_plaintext, best_shift))
+    let final_plaintext = Arc::try_unwrap(best_plaintext)
+      .unwrap()
+      .into_inner()
+      .unwrap();
+
+    let final_shift =
+      Arc::try_unwrap(best_shift).unwrap().into_inner().unwrap();
+
+    Ok((final_plaintext, final_shift))
   }
 
   pub fn decrypt_caesar_cipher<R: Read>(
