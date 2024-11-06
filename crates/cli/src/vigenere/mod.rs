@@ -166,12 +166,9 @@ impl Vigenere {
     let plaintext: String = content
       .chars()
       .map(|c| {
-        if c.is_ascii_alphabetic() {
-          let key_char = key_chars.next().unwrap();
-          Caesar::shift(c, key_char, -1)
-        } else {
-          c
-        }
+        c.is_ascii_alphabetic()
+          .then(|| Caesar::shift(c, key_chars.next().unwrap(), -1))
+          .unwrap_or(c)
       })
       .collect();
 
