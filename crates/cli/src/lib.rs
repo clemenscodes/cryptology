@@ -3,13 +3,13 @@ pub mod frequency_analysis;
 pub mod monoalphabetic_substitution;
 pub mod vigenere;
 
-use caesar::CaesarCipher;
+use caesar::Caesar;
 use clap::{Parser, Subcommand};
 use monoalphabetic_substitution::MonoalphabeticSubstition;
 use std::fs::File;
 use std::io::{self, Read, Result, Write};
 use std::path::PathBuf;
-use vigenere::VigenereCipher;
+use vigenere::Vigenere;
 
 use frequency_analysis::FrequencyAnalyzer;
 
@@ -201,7 +201,7 @@ impl EncryptCipher {
       EncryptCipher::Vigenere { default_args, .. } => {
         let (mut input, mut output) = Command::get_files(default_args);
         let config = self.into();
-        VigenereCipher::encrypt(&mut input, &mut output, config)
+        Vigenere::encrypt(&mut input, &mut output, config)
       }
     }
   }
@@ -217,12 +217,12 @@ impl DecryptCipher {
       }
       DecryptCipher::Caesar { default_args } => {
         let (mut input, mut output) = Command::get_files(default_args);
-        CaesarCipher::decrypt(&mut input, &mut output)
+        Caesar::decrypt(&mut input, &mut output)
       }
       DecryptCipher::Vigenere { default_args, .. } => {
         let (mut input, mut output) = Command::get_files(default_args);
         let config = self.into();
-        VigenereCipher::decrypt(&mut input, &mut output, config)
+        Vigenere::decrypt(&mut input, &mut output, config)
       }
     }
   }
