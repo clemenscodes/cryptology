@@ -1,6 +1,7 @@
 pub mod caesar;
 pub mod frequency_analysis;
 pub mod monoalphabetic_substitution;
+pub mod one_time_pad;
 pub mod vigenere;
 
 use caesar::Caesar;
@@ -176,6 +177,13 @@ pub enum DecryptCipher {
     )]
     max_key_length: Option<u8>,
   },
+
+  /// Use the One-Time-Pad cipher for decryption.
+  #[command(name = "one-time-pad", visible_alias = "otp")]
+  OneTimePad {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+  },
 }
 
 impl Command {
@@ -223,6 +231,11 @@ impl DecryptCipher {
         let (mut input, mut output) = Command::get_files(default_args);
         let config = self.into();
         Vigenere::decrypt(&mut input, &mut output, config)
+      }
+      DecryptCipher::OneTimePad { default_args } => {
+        let (mut input, mut output) = Command::get_files(default_args);
+        OneTimePad::decrypt(&mut input, &mut output)?;
+        Ok(())
       }
     }
   }
