@@ -101,18 +101,14 @@ impl Vigenere {
     let key = config.key.to_uppercase();
     let mut content = String::new();
     let mut key_chars = key.chars().cycle();
-
     input.read_to_string(&mut content)?;
 
     let cipher: String = content
       .chars()
       .map(|c| {
-        if c.is_ascii_alphabetic() {
-          let key_char = key_chars.next().unwrap();
-          Caesar::shift(c, key_char, 1)
-        } else {
-          c
-        }
+        c.is_ascii_alphabetic()
+          .then(|| Caesar::shift(c, key_chars.next().unwrap(), 1))
+          .unwrap_or(c)
       })
       .collect();
 
@@ -153,8 +149,8 @@ impl Vigenere {
     };
 
     result
-      .map(|_| String::from_utf8(output).unwrap_or_else(|_| line.to_string()))
-      .unwrap_or_else(|_| line.to_string())
+      .map(|_| String::from_utf8(output).unwrap_or_else(|_| line.into()))
+      .unwrap_or_else(|_| line.into())
   }
 
   fn decrypt_with_key<R: Read, W: Write>(
@@ -164,11 +160,10 @@ impl Vigenere {
   ) -> Result<()> {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
-
     let key = key.to_uppercase();
     let mut key_chars = key.chars().cycle();
 
-    let decipher: String = content
+    let plaintext: String = content
       .chars()
       .map(|c| {
         if c.is_ascii_alphabetic() {
@@ -180,7 +175,7 @@ impl Vigenere {
       })
       .collect();
 
-    write!(output, "{decipher}")?;
+    write!(output, "{plaintext}")?;
     Ok(())
   }
 
@@ -190,13 +185,10 @@ impl Vigenere {
     key_length: u8,
   ) -> Result<()> {
     let mut content = String::new();
-
     input.read_to_string(&mut content)?;
-
     let mut shifts: Vec<u8> = Vec::new();
     let mut buf = Self::get_readable(&content);
-    let segments = Vigenere::segment_text(&mut buf, key_length)?;
-    let caesars = Vigenere::create_caesars(segments, key_length);
+    let caesars = Vigenere::caesar_segments(&mut buf, key_length)?;
 
     for caesar in &caesars {
       let mut buf = Self::get_readable(caesar);
@@ -207,11 +199,8 @@ impl Vigenere {
     let mut input = Self::get_readable(&content);
     let mut buf = Vec::new();
     let key = Self::derive_key(shifts);
-
     Vigenere::decrypt_with_key(&mut input, &mut buf, &key)?;
-
     let plaintext = String::from_utf8(buf).unwrap();
-
     write!(output, "{plaintext}")?;
     Ok(())
   }
@@ -230,8 +219,7 @@ impl Vigenere {
     (2..=max_key_length).into_par_iter().for_each(|key_length| {
       let mut shifts = vec![0u8; key_length as usize];
       let mut input = Self::get_readable(&content);
-      let segments = Self::segment_text(&mut input, key_length).unwrap();
-      let caesars = Vigenere::create_caesars(segments, key_length);
+      let caesars = Self::caesar_segments(&mut input, key_length).unwrap();
 
       caesars.into_iter().enumerate().for_each(|(index, caesar)| {
         let mut buf = Self::get_readable(&caesar);
@@ -240,74 +228,45 @@ impl Vigenere {
       });
 
       let key = Self::derive_key(shifts);
-
       let mut buf = Vec::new();
       let mut input = Self::get_readable(&content);
       Self::decrypt_with_key(&mut input, &mut buf, &key).unwrap();
-
       let candidate = String::from_utf8(buf).unwrap();
       let mut input = Self::get_readable(&candidate);
-      let mut output = Vec::new();
 
-      if let Ok(fa) = FrequencyAnalyzer::analyze(&mut input, &mut output) {
-        let score = FrequencyAnalyzer::chi_square_score(&fa);
+      if let Ok(score) = FrequencyAnalyzer::score_text(&mut input) {
+        let local_best_result = (candidate.clone(), score);
 
         let mut best_result = best_result.lock().unwrap();
-        if score < best_result.1 {
-          *best_result = (candidate, score);
+        if local_best_result.1 < best_result.1 {
+          *best_result = local_best_result;
         }
       }
     });
 
-    let best_plaintext = best_result.lock().unwrap().0.clone();
-    write!(output, "{best_plaintext}")?;
+    let plaintext = best_result.lock().unwrap().0.clone();
+    write!(output, "{plaintext}")?;
     Ok(())
   }
 
-  fn segment_text<R: Read>(
+  fn caesar_segments<R: Read>(
     input: &mut R,
     key_length: u8,
   ) -> Result<Vec<String>> {
-    let mut chunks: Vec<String> = Vec::new();
+    let mut caesars = vec![String::new(); key_length as usize];
+    let mut index = 0;
     let mut text = String::new();
-
     input.read_to_string(&mut text)?;
 
-    let mut chars = text.chars();
-
-    loop {
-      let mut chunk: Vec<char> = Vec::new();
-
-      while chunk.len() < key_length as usize {
-        if let Some(c) = chars.next() {
-          if c.is_ascii_alphabetic() {
-            chunk.push(c);
-          }
-        } else {
-          break;
-        }
-      }
-
-      if chunk.is_empty() {
-        break;
-      }
-
-      chunks.push(chunk.into_iter().collect());
-    }
-
-    Ok(chunks)
-  }
-
-  fn create_caesars(chunks: Vec<String>, key_length: u8) -> Vec<String> {
-    let mut caesars: Vec<String> = vec![String::new(); key_length as usize];
-
-    for chunk in chunks {
-      for (index, c) in chunk.chars().enumerate() {
-        caesars[index].push(c);
+    for c in text.chars() {
+      if c.is_ascii_alphabetic() {
+        let group_index = index % key_length as usize;
+        caesars[group_index].push(c);
+        index += 1;
       }
     }
 
-    caesars
+    Ok(caesars)
   }
 
   fn get_readable(input: &str) -> Cursor<Vec<u8>> {
@@ -341,19 +300,13 @@ mod tests {
 
     let input_path = path.join("input.txt");
     let output_path = path.join("output.txt");
-
     let mut input_file = File::open(&input_path)?;
     let mut output_buffer = Vec::new();
     let config = VigenereDecryptConfig::default();
-
     Vigenere::decrypt(&mut input_file, &mut output_buffer, config)?;
-
     let mut expected_output = String::new();
     File::open(&output_path)?.read_to_string(&mut expected_output)?;
-
-    let output_string = String::from_utf8(output_buffer)
-      .expect("Failed to convert output buffer to UTF-8 string");
-
+    let output_string = String::from_utf8(output_buffer).unwrap();
     assert_eq!(output_string, expected_output);
     Ok(())
   }
@@ -365,10 +318,8 @@ mod tests {
     let mut input = Cursor::new(input_text);
     let mut output = Vec::new();
     let config = VigenereEncryptConfig::new(key);
-
     Vigenere::encrypt(&mut input, &mut output, config).unwrap();
     let encrypted_text = String::from_utf8(output).unwrap();
-
     assert_eq!(encrypted_text, "RIJVS UYVJN");
   }
 
@@ -379,10 +330,8 @@ mod tests {
     let mut input = Cursor::new(input_text);
     let mut output = Vec::new();
     let config = VigenereEncryptConfig::new(key);
-
     Vigenere::encrypt(&mut input, &mut output, config).unwrap();
     let encrypted_text = String::from_utf8(output).unwrap();
-
     assert_eq!(encrypted_text, "rijvs uyvjn");
   }
 
@@ -393,10 +342,8 @@ mod tests {
     let mut input = Cursor::new(input_text);
     let mut output = Vec::new();
     let config = VigenereEncryptConfig::new(key);
-
     Vigenere::encrypt(&mut input, &mut output, config).unwrap();
     let encrypted_text = String::from_utf8(output).unwrap();
-
     assert_eq!(encrypted_text, "RIJVS, UYVJN!");
   }
 
@@ -406,10 +353,8 @@ mod tests {
     let key = "KEY";
     let mut input = Cursor::new(encrypted_text);
     let mut output = Vec::new();
-
     Vigenere::decrypt_with_key(&mut input, &mut output, key).unwrap();
     let decrypted_text = String::from_utf8(output).unwrap();
-
     assert_eq!(decrypted_text, "HELLO WORLD");
   }
 
@@ -419,10 +364,8 @@ mod tests {
     let key = "key";
     let mut input = Cursor::new(encrypted_text);
     let mut output = Vec::new();
-
     Vigenere::decrypt_with_key(&mut input, &mut output, key).unwrap();
     let decrypted_text = String::from_utf8(output).unwrap();
-
     assert_eq!(decrypted_text, "hello world");
   }
 
@@ -432,10 +375,8 @@ mod tests {
     let key = "KeY";
     let mut input = Cursor::new(encrypted_text);
     let mut output = Vec::new();
-
     Vigenere::decrypt_with_key(&mut input, &mut output, key).unwrap();
     let decrypted_text = String::from_utf8(output).unwrap();
-
     assert_eq!(decrypted_text, "HeLlO WoRlD");
   }
 
@@ -445,56 +386,16 @@ mod tests {
     let key = "KEY";
     let mut input = Cursor::new(encrypted_text);
     let mut output = Vec::new();
-
     Vigenere::decrypt_with_key(&mut input, &mut output, key).unwrap();
     let decrypted_text = String::from_utf8(output).unwrap();
-
     assert_eq!(decrypted_text, "HELLO, WORLD!");
-  }
-
-  #[test]
-  fn test_segment_text_by_key_length_basic() {
-    let mut text = Cursor::new("VIGENERE");
-    let key_length = 3;
-    let segments = Vigenere::segment_text(&mut text, key_length).unwrap();
-
-    assert_eq!(
-      segments,
-      vec!["VIG".to_string(), "ENE".to_string(), "RE".to_string()]
-    );
-  }
-
-  #[test]
-  fn test_segment_text_by_key_length_with_spaces() {
-    let mut text = Cursor::new("VIGENERE CIPHER");
-    let key_length = 4;
-    let segments = Vigenere::segment_text(&mut text, key_length).unwrap();
-    assert_eq!(
-      segments,
-      vec![
-        "VIGE".to_string(),
-        "NERE".to_string(),
-        "CIPH".to_string(),
-        "ER".to_string()
-      ]
-    );
-  }
-
-  #[test]
-  fn test_segment_text_by_key_length_with_non_alpha() {
-    let mut text = Cursor::new("V1G3N!E#R$E%");
-    let key_length = 5;
-    let segments = Vigenere::segment_text(&mut text, key_length).unwrap();
-    assert_eq!(segments, vec!["VGNER".to_string(), "E".to_string()]);
   }
 
   #[test]
   fn test_create_caesars() {
     let mut text = Cursor::new("VIGENERE");
     let key_length = 3;
-    let segments = Vigenere::segment_text(&mut text, key_length).unwrap();
-    let caesars = Vigenere::create_caesars(segments, key_length);
-
+    let caesars = Vigenere::caesar_segments(&mut text, key_length).unwrap();
     assert_eq!(
       caesars,
       vec!["VER".to_string(), "INE".to_string(), "GE".to_string()]

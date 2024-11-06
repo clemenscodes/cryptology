@@ -54,6 +54,14 @@ impl FrequencyAnalyzer {
 
     score
   }
+
+  pub fn score_text<R: Read>(input: &mut R) -> Result<f32> {
+    let mut output = Vec::new();
+    let frequency_analysis = FrequencyAnalyzer::analyze(input, &mut output)?;
+    let score = FrequencyAnalyzer::chi_square_score(&frequency_analysis);
+
+    Ok(score)
+  }
 }
 
 #[derive(PartialEq, Eq)]

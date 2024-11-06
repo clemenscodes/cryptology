@@ -17,7 +17,7 @@ impl Caesar {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
 
-    let decrypted_lines: Vec<String> = content
+    let plaintext: Vec<String> = content
       .lines()
       .map(|line| {
         let mut content = Cursor::new(line);
@@ -27,7 +27,7 @@ impl Caesar {
       })
       .collect();
 
-    for line in decrypted_lines {
+    for line in plaintext {
       writeln!(output, "{line}")?;
     }
 
@@ -49,15 +49,14 @@ impl Caesar {
       let mut cursor = Cursor::new(copy.as_bytes());
       let candidate = Self::decrypt_cipher(&mut cursor, shift).unwrap();
       let mut buf = Cursor::new(candidate.as_bytes());
-      let mut output = Vec::new();
-      let fa = FrequencyAnalyzer::analyze(&mut buf, &mut output).unwrap();
-      let score = FrequencyAnalyzer::chi_square_score(&fa);
 
-      let mut best_score_guard = best_score.lock().unwrap();
-      if score < *best_score_guard {
-        *best_score_guard = score;
-        *best_plaintext.lock().unwrap() = candidate;
-        *best_shift.lock().unwrap() = shift;
+      if let Ok(score) = FrequencyAnalyzer::score_text(&mut buf) {
+        let mut best_score_guard = best_score.lock().unwrap();
+        if score < *best_score_guard {
+          *best_score_guard = score;
+          *best_plaintext.lock().unwrap() = candidate;
+          *best_shift.lock().unwrap() = shift;
+        }
       }
     });
 
