@@ -4,15 +4,17 @@ pub mod monoalphabetic_substitution;
 pub mod one_time_pad;
 pub mod vigenere;
 
-use caesar::Caesar;
 use clap::{Parser, Subcommand};
-use monoalphabetic_substitution::MonoalphabeticSubstition;
+
 use std::fs::File;
 use std::io::{self, Read, Result, Write};
 use std::path::PathBuf;
-use vigenere::Vigenere;
 
+use caesar::Caesar;
 use frequency_analysis::FrequencyAnalyzer;
+use monoalphabetic_substitution::MonoalphabeticSubstition;
+use one_time_pad::OneTimePad;
+use vigenere::Vigenere;
 
 /// Cryptology CLI tool for cryptographic operations.
 ///
@@ -234,8 +236,7 @@ impl DecryptCipher {
       }
       DecryptCipher::OneTimePad { default_args } => {
         let (mut input, mut output) = Command::get_files(default_args);
-        OneTimePad::decrypt(&mut input, &mut output)?;
-        Ok(())
+        OneTimePad::decrypt(&mut input, &mut output)
       }
     }
   }
