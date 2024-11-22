@@ -242,7 +242,8 @@ impl EncryptCipher {
       EncryptCipher::OneTimePad { default_args, .. } => {
         let (mut input, mut output) = Command::get_files(default_args);
         let config = self.into();
-        OneTimePad::encrypt(&mut input, &mut output, config)
+        OneTimePad::encrypt(&mut input, &mut output, config)?;
+        Ok(())
       }
     }
   }
@@ -268,7 +269,8 @@ impl DecryptCipher {
       DecryptCipher::OneTimePad { default_args, .. } => {
         let (mut input, mut output) = Command::get_files(default_args);
         let config = self.into();
-        OneTimePad::decrypt(&mut input, &mut output, config)
+        OneTimePad::decrypt(&mut input, &mut output, config)?;
+        Ok(())
       }
     }
   }
