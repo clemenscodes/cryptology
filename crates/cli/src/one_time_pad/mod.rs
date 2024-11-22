@@ -140,11 +140,11 @@ impl OneTimePad {
   }
 
   fn xor(alpha: &[u8], beta: &[u8]) -> Vec<u8> {
-    alpha
-      .iter()
-      .zip(beta.iter())
-      .map(|(alpha, beta)| alpha ^ beta)
-      .collect()
+    let max_len = std::cmp::max(alpha.len(), beta.len());
+    let alpha_padded = alpha.iter().chain(std::iter::repeat(&0)).take(max_len);
+    let beta_padded = beta.iter().chain(std::iter::repeat(&0)).take(max_len);
+
+    alpha_padded.zip(beta_padded).map(|(a, b)| a ^ b).collect()
   }
 
   fn parse_hex_string(hex: &str) -> Result<Self, HexParseError> {
@@ -241,7 +241,7 @@ mod tests {
 
   #[test]
   fn test_xor() {
-    let alpha = b"Hello";
+    let alpha = b"Hell0";
     let beta = b"World";
 
     let result = OneTimePad::xor(alpha, beta);
@@ -280,5 +280,38 @@ mod tests {
     let expected = vec![229_u8, 8_u8];
 
     assert_eq!(otp.bytes, expected);
+  }
+
+  #[test]
+  fn test_xor_with_key_longer_than_plaintext() {
+    let plaintext = b"HELLO";
+    let key = b"SECRETKEY";
+
+    let expected_result = vec![27, 0, 15, 30, 10, 84, 75, 69, 89];
+    let result = OneTimePad::xor(plaintext, key);
+
+    assert_eq!(result, expected_result);
+  }
+
+  #[test]
+  fn test_xor_with_plaintext_longer_than_key() {
+    let plaintext = b"HELLOTHERE";
+    let key = b"KEY";
+
+    let expected_result = vec![3, 0, 21, 76, 79, 84, 72, 69, 82, 69];
+    let result = OneTimePad::xor(plaintext, key);
+
+    assert_eq!(result, expected_result);
+  }
+
+  #[test]
+  fn test_xor_with_empty_inputs() {
+    let alpha = b"";
+    let beta = b"";
+
+    let expected_result: Vec<u8> = vec![];
+    let result = OneTimePad::xor(alpha, beta);
+
+    assert_eq!(result, expected_result);
   }
 }
