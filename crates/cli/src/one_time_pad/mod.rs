@@ -1,6 +1,7 @@
 use std::{
   fmt::Display,
-  io::{Error, ErrorKind, Read, Result, Write},
+  io::{Error, ErrorKind, Read, Write},
+  num::ParseIntError,
 };
 
 use crate::{DecryptCipher, EncryptCipher};
@@ -15,7 +16,7 @@ impl OneTimePadDecryptConfig {
     Self { key }
   }
 
-  pub fn validate(&self, input_length: usize) -> Result<()> {
+  pub fn validate(&self, input_length: usize) -> std::io::Result<()> {
     if let Some(key) = &self.key {
       let expected = key.len();
 
@@ -52,7 +53,7 @@ impl OneTimePadEncryptConfig {
     }
   }
 
-  pub fn validate(&self, input_length: usize) -> Result<()> {
+  pub fn validate(&self, input_length: usize) -> std::io::Result<()> {
     let expected = self.key.len();
     if expected < input_length {
       let message = format!("Key length must be at least as long as the input length. [{expected}/{input_length}]");
@@ -94,7 +95,7 @@ impl OneTimePad {
     input: &mut R,
     output: &mut W,
     config: OneTimePadEncryptConfig,
-  ) -> Result<Self> {
+  ) -> std::io::Result<Self> {
     let mut plaintext = String::new();
 
     input.read_to_string(&mut plaintext)?;
@@ -115,17 +116,19 @@ impl OneTimePad {
     input: &mut R,
     output: &mut W,
     config: OneTimePadDecryptConfig,
-  ) -> Result<Self> {
+  ) -> std::io::Result<Self> {
     let mut ciphertext = String::new();
 
     input.read_to_string(&mut ciphertext)?;
 
+    let otp = Self::parse_hex_string(&ciphertext).unwrap();
+
     config.validate(ciphertext.len())?;
 
     if let Some(key) = &config.key {
-      let alpha = ciphertext.as_bytes();
+      let alpha = format!("{otp}");
       let beta = key.as_bytes();
-      let bytes = Self::xor(alpha, beta);
+      let bytes = Self::xor(alpha.as_bytes(), beta);
       let otp = Self { bytes };
 
       write!(output, "{otp}")?;
@@ -142,6 +145,47 @@ impl OneTimePad {
       .zip(beta.iter())
       .map(|(alpha, beta)| alpha ^ beta)
       .collect()
+  }
+
+  fn parse_hex_string(hex: &str) -> Result<Self, HexParseError> {
+    if hex.len() % 2 != 0 {
+      return Err(HexParseError::InvalidLength);
+    }
+
+    let mut bytes = Vec::new();
+
+    for index in (0..hex.len()).step_by(2) {
+      let hex_pair = &hex[index..index + 2];
+      let byte = u8::from_str_radix(hex_pair, 16)?;
+      bytes.push(byte);
+    }
+
+    Ok(Self { bytes })
+  }
+}
+
+#[derive(Debug)]
+enum HexParseError {
+  InvalidLength,
+  InvalidHex(ParseIntError),
+}
+
+impl std::fmt::Display for HexParseError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      HexParseError::InvalidLength => {
+        write!(f, "Hex string must have an even length.")
+      }
+      HexParseError::InvalidHex(err) => {
+        write!(f, "Failed to parse hex: {err}")
+      }
+    }
+  }
+}
+
+impl From<ParseIntError> for HexParseError {
+  fn from(err: ParseIntError) -> Self {
+    HexParseError::InvalidHex(err)
   }
 }
 
@@ -225,5 +269,16 @@ mod tests {
     let expected = String::from("0000000000");
 
     assert_eq!(result, expected);
+  }
+
+  #[test]
+  fn test_parse_hex() {
+    let input = "e508";
+
+    let otp = OneTimePad::parse_hex_string(input).unwrap();
+
+    let expected = vec![229_u8, 8_u8];
+
+    assert_eq!(otp.bytes, expected);
   }
 }
