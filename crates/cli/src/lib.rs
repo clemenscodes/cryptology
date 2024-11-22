@@ -7,7 +7,7 @@ pub mod vigenere;
 use clap::{Parser, Subcommand};
 
 use std::fs::File;
-use std::io::{self, Read, Result, Write};
+use std::io::{self, Cursor, Read, Result, Write};
 use std::path::PathBuf;
 
 use caesar::Caesar;
@@ -75,6 +75,30 @@ pub struct CryptologyDefaultArgs {
   output: Option<PathBuf>,
 }
 
+#[derive(Debug, Parser)]
+pub struct CryptologyEncryptKeyArg {
+  /// Key used for encryption
+  #[arg(
+    short = 'k',
+    long = "key",
+    value_name = "KEY",
+    help = "Key used for encryption"
+  )]
+  key: String,
+}
+
+#[derive(Debug, Parser)]
+pub struct CryptologyDecryptKeyArg {
+  /// Key used for decryption if known.
+  #[arg(
+    short = 'k',
+    long = "key",
+    value_name = "KEY",
+    help = "The decryption key if known"
+  )]
+  key: Option<String>,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum Command {
   /// Perform frequency analysis on text data.
@@ -119,14 +143,19 @@ pub enum EncryptCipher {
   Vigenere {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
-    /// Specify the key for encryption.
-    #[arg(
-      short = 'k',
-      long = "key",
-      value_name = "KEY",
-      help = "Encryption key"
-    )]
-    key: String,
+
+    #[command(flatten)]
+    key: CryptologyEncryptKeyArg,
+  },
+
+  /// Use the One Time Pad cipher for encryption.
+  #[command(name = "one-time-pad", visible_alias = "otp")]
+  OneTimePad {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+
+    #[command(flatten)]
+    key: CryptologyEncryptKeyArg,
   },
 }
 
@@ -152,14 +181,8 @@ pub enum DecryptCipher {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
 
-    /// Specify the decryption key if known.
-    #[arg(
-      short = 'k',
-      long = "key",
-      value_name = "KEY",
-      help = "The decryption key if known"
-    )]
-    key: Option<String>,
+    #[command(flatten)]
+    key: CryptologyDecryptKeyArg,
 
     /// Specify the key length if known.
     #[arg(
@@ -185,6 +208,9 @@ pub enum DecryptCipher {
   OneTimePad {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
+
+    #[command(flatten)]
+    key: CryptologyDecryptKeyArg,
   },
 }
 
@@ -213,6 +239,11 @@ impl EncryptCipher {
         let config = self.into();
         Vigenere::encrypt(&mut input, &mut output, config)
       }
+      EncryptCipher::OneTimePad { default_args, .. } => {
+        let (mut input, mut output) = Command::get_files(default_args);
+        let config = self.into();
+        OneTimePad::encrypt(&mut input, &mut output, config)
+      }
     }
   }
 }
@@ -234,9 +265,10 @@ impl DecryptCipher {
         let config = self.into();
         Vigenere::decrypt(&mut input, &mut output, config)
       }
-      DecryptCipher::OneTimePad { default_args } => {
+      DecryptCipher::OneTimePad { default_args, .. } => {
         let (mut input, mut output) = Command::get_files(default_args);
-        OneTimePad::decrypt(&mut input, &mut output)
+        let config = self.into();
+        OneTimePad::decrypt(&mut input, &mut output, config)
       }
     }
   }
@@ -267,5 +299,9 @@ impl Command {
       }
       None => Box::new(io::stdout()),
     }
+  }
+
+  fn get_readable(input: &str) -> Cursor<Vec<u8>> {
+    Cursor::new(input.as_bytes().to_vec())
   }
 }
