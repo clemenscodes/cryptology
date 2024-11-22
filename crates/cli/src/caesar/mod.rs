@@ -131,6 +131,35 @@ mod tests {
   }
 
   #[test]
+  fn test_example_output_2() -> Result<()> {
+    let assets = "src/caesar/assets";
+    let path = env::var("CARGO_MANIFEST_DIR")
+      .map(|dir| PathBuf::from(dir).join(assets))
+      .unwrap_or_else(|_| {
+        env::current_dir()
+          .expect("Failed to get current directory")
+          .join("crates/cli")
+          .join(assets)
+      });
+
+    let input_path = path.join("input2.txt");
+    let output_path = path.join("output2.txt");
+
+    let mut input_file = File::open(&input_path)?;
+    let mut output_buffer = Vec::new();
+
+    Caesar::decrypt(&mut input_file, &mut output_buffer)?;
+
+    let mut expected_output = String::new();
+    File::open(&output_path)?.read_to_string(&mut expected_output)?;
+
+    let output_string = String::from_utf8(output_buffer).unwrap();
+
+    assert_eq!(output_string, expected_output);
+    Ok(())
+  }
+
+  #[test]
   fn test_decipher_with_shift_0() -> Result<()> {
     let mut input = Cursor::new("No shift should keep the text unchanged.");
     let mut output = Vec::new();
