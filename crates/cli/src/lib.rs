@@ -153,14 +153,23 @@ pub enum Command {
     )]
     output: Option<PathBuf>,
 
-    /// Treat input as raw hex string
+    /// Treat alpha as raw hex string
     #[arg(
       short = 'r',
       long = "raw",
-      value_name = "OUTPUT",
-      help = "Treats the input as raw hex"
+      value_name = "RAW ALPHA",
+      help = "Treats the alpha as raw hex"
     )]
-    raw: bool,
+    raw_alpha: bool,
+
+    /// Treat beta as raw hex string
+    #[arg(
+      short = 'y',
+      long = "raw",
+      value_name = "RAW BETA",
+      help = "Treats the beta as raw hex"
+    )]
+    raw_beta: bool,
   },
 
   /// Display and parse an input as a hexadecimal string
@@ -224,6 +233,24 @@ pub enum EncryptCipher {
 
     #[command(flatten)]
     key: CryptologyEncryptKeyArg,
+
+    /// Treat input as raw hex string
+    #[arg(
+      short = 'r',
+      long = "raw-input",
+      value_name = "RAW INPUT",
+      help = "Treats the input as raw hex"
+    )]
+    raw_input: bool,
+
+    /// Treat key as raw hex string
+    #[arg(
+      short = 'y',
+      long = "raw-key",
+      value_name = "RAW KEY",
+      help = "Treats the key as raw hex"
+    )]
+    raw_key: bool,
   },
 }
 
@@ -279,6 +306,24 @@ pub enum DecryptCipher {
 
     #[command(flatten)]
     key: CryptologyDecryptKeyArg,
+
+    /// Treat input as raw hex string
+    #[arg(
+      short = 'r',
+      long = "raw-input",
+      value_name = "RAW INPUT",
+      help = "Treats the input as raw hex"
+    )]
+    raw_input: bool,
+
+    /// Treat key as raw hex string
+    #[arg(
+      short = 'y',
+      long = "raw-key",
+      value_name = "RAW KEY",
+      help = "Treats the key as raw hex"
+    )]
+    raw_key: bool,
   },
 }
 
@@ -320,8 +365,8 @@ impl EncryptCipher {
       }
       EncryptCipher::OneTimePad { default_args, .. } => {
         let (mut input, mut output) = Command::get_files(default_args);
-        let config = self.into();
-        OneTimePad::encrypt(&mut input, &mut output, config)?;
+        let mut config = self.into();
+        OneTimePad::encrypt(&mut input, &mut output, &mut config)?;
         Ok(())
       }
     }
@@ -347,8 +392,8 @@ impl DecryptCipher {
       }
       DecryptCipher::OneTimePad { default_args, .. } => {
         let (mut input, mut output) = Command::get_files(default_args);
-        let config = self.into();
-        OneTimePad::decrypt(&mut input, &mut output, config)?;
+        let mut config = self.into();
+        OneTimePad::decrypt(&mut input, &mut output, &mut config)?;
         Ok(())
       }
     }

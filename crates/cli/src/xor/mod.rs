@@ -6,12 +6,23 @@ use crate::{hex::Hex, Command};
 pub struct XorConfig {
   alpha: PathBuf,
   beta: PathBuf,
-  raw: bool,
+  raw_alpha: bool,
+  raw_beta: bool,
 }
 
 impl XorConfig {
-  pub fn new(alpha: PathBuf, beta: PathBuf, raw: bool) -> Self {
-    Self { alpha, beta, raw }
+  pub fn new(
+    alpha: PathBuf,
+    beta: PathBuf,
+    raw_alpha: bool,
+    raw_beta: bool,
+  ) -> Self {
+    Self {
+      alpha,
+      beta,
+      raw_alpha,
+      raw_beta,
+    }
   }
 }
 
@@ -19,8 +30,17 @@ impl From<&Command> for XorConfig {
   fn from(value: &Command) -> Self {
     match value {
       Command::Xor {
-        alpha, beta, raw, ..
-      } => Self::new(alpha.to_path_buf(), beta.to_path_buf(), *raw),
+        alpha,
+        beta,
+        raw_alpha,
+        raw_beta,
+        ..
+      } => Self::new(
+        alpha.to_path_buf(),
+        beta.to_path_buf(),
+        *raw_alpha,
+        *raw_beta,
+      ),
       _ => Self::default(),
     }
   }
@@ -28,7 +48,7 @@ impl From<&Command> for XorConfig {
 
 #[derive(Default, PartialEq, Eq)]
 pub struct Xor {
-  hex: Hex,
+  pub hex: Hex,
 }
 
 impl Xor {
@@ -43,11 +63,19 @@ impl Xor {
     let alpha = std::fs::read(config.alpha)?;
     let beta = std::fs::read(config.beta)?;
 
-    let alpha = if config.raw {
+    let alpha = if config.raw_alpha {
       let alpha = String::from_utf8(alpha).unwrap();
       Hex::parse_hex(&alpha).unwrap().bytes
     } else {
       let hex: Hex = alpha.try_into().unwrap();
+      hex.bytes
+    };
+
+    let beta = if config.raw_beta {
+      let beta = String::from_utf8(beta).unwrap();
+      Hex::parse_hex(&beta).unwrap().bytes
+    } else {
+      let hex: Hex = beta.try_into().unwrap();
       hex.bytes
     };
 

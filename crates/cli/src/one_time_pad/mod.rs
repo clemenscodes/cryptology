@@ -1,41 +1,90 @@
 use std::{
   fmt::Display,
   io::{Error, ErrorKind, Read, Write},
-  num::ParseIntError,
 };
 
-use crate::{DecryptCipher, EncryptCipher};
+use crate::{hex::Hex, xor::Xor, DecryptCipher, EncryptCipher};
 
 #[derive(Default, Debug)]
 pub struct OneTimePadDecryptConfig {
   pub key: Option<String>,
+  pub raw_input: bool,
+  pub raw_key: bool,
+  alpha: Option<Vec<u8>>,
+  beta: Option<Vec<u8>>,
 }
 
 impl OneTimePadDecryptConfig {
-  pub fn new(key: Option<String>) -> Self {
-    Self { key }
+  pub fn new(
+    key: Option<String>,
+    raw_input: bool,
+    raw_key: bool,
+    alpha: Option<Vec<u8>>,
+    beta: Option<Vec<u8>>,
+  ) -> Self {
+    Self {
+      key,
+      raw_input,
+      raw_key,
+      alpha,
+      beta,
+    }
   }
 
-  pub fn validate(&self, input_length: usize) -> std::io::Result<()> {
-    if let Some(key) = &self.key {
-      let expected = key.len();
+  pub fn set_alpha(&mut self, alpha: Option<Vec<u8>>) {
+    self.alpha = alpha;
+  }
 
-      if expected < input_length {
-        let message = format!("Key length must be at least as long as the input length. [{expected}/{input_length}]");
-        return Err(Error::new(ErrorKind::InvalidInput, message));
-      }
+  pub fn set_beta(&mut self, beta: Option<Vec<u8>>) {
+    self.beta = beta;
+  }
+
+  pub fn validate(&self) -> std::io::Result<()> {
+    let alpha = self.alpha()?;
+    let beta = self.beta()?;
+
+    if alpha.len() > beta.len() {
+      let message = "Key must not have less bytes than the input";
+      return Err(Error::new(ErrorKind::Other, message));
     }
 
     Ok(())
+  }
+
+  pub fn alpha(&self) -> std::io::Result<Vec<u8>> {
+    if let Some(alpha) = &self.alpha {
+      Ok(alpha.to_vec())
+    } else {
+      let message = "Could not get input bytes";
+      Err(Error::new(ErrorKind::Other, message))
+    }
+  }
+
+  pub fn beta(&self) -> std::io::Result<Vec<u8>> {
+    if let Some(beta) = &self.beta {
+      Ok(beta.to_vec())
+    } else {
+      let message = "Could not get key bytes";
+      Err(Error::new(ErrorKind::Other, message))
+    }
   }
 }
 
 impl From<&DecryptCipher> for OneTimePadDecryptConfig {
   fn from(value: &DecryptCipher) -> Self {
     match value {
-      DecryptCipher::OneTimePad { key, .. } => {
-        OneTimePadDecryptConfig::new(key.key.clone())
-      }
+      DecryptCipher::OneTimePad {
+        key,
+        raw_input,
+        raw_key,
+        ..
+      } => OneTimePadDecryptConfig::new(
+        key.key.clone(),
+        *raw_input,
+        *raw_key,
+        None,
+        None,
+      ),
       _ => OneTimePadDecryptConfig::default(),
     }
   }
@@ -43,69 +92,134 @@ impl From<&DecryptCipher> for OneTimePadDecryptConfig {
 
 #[derive(Default, Debug)]
 pub struct OneTimePadEncryptConfig {
-  key: String,
+  pub key: String,
+  pub raw_input: bool,
+  pub raw_key: bool,
+  alpha: Option<Vec<u8>>,
+  beta: Option<Vec<u8>>,
 }
 
 impl OneTimePadEncryptConfig {
-  pub fn new(key: &str) -> Self {
+  pub fn new(
+    key: String,
+    raw_input: bool,
+    raw_key: bool,
+    alpha: Option<Vec<u8>>,
+    beta: Option<Vec<u8>>,
+  ) -> Self {
     Self {
-      key: key.to_string(),
+      key,
+      raw_input,
+      raw_key,
+      alpha,
+      beta,
     }
   }
 
-  pub fn validate(&self, input_length: usize) -> std::io::Result<()> {
-    let expected = self.key.len();
-    if expected < input_length {
-      let message = format!("Key length must be at least as long as the input length. [{expected}/{input_length}]");
-      return Err(Error::new(ErrorKind::InvalidInput, message));
+  pub fn set_alpha(&mut self, alpha: Option<Vec<u8>>) {
+    self.alpha = alpha;
+  }
+
+  pub fn set_beta(&mut self, beta: Option<Vec<u8>>) {
+    self.beta = beta;
+  }
+
+  pub fn validate(&self) -> std::io::Result<()> {
+    let alpha = self.alpha()?;
+    let beta = self.beta()?;
+
+    if alpha.len() > beta.len() {
+      let message = "Key must not have less bytes than the input";
+      return Err(Error::new(ErrorKind::Other, message));
     }
+
     Ok(())
+  }
+
+  pub fn alpha(&self) -> std::io::Result<Vec<u8>> {
+    if let Some(alpha) = &self.alpha {
+      Ok(alpha.to_vec())
+    } else {
+      let message = "Could not get input bytes";
+      Err(Error::new(ErrorKind::Other, message))
+    }
+  }
+
+  pub fn beta(&self) -> std::io::Result<Vec<u8>> {
+    if let Some(beta) = &self.beta {
+      Ok(beta.to_vec())
+    } else {
+      let message = "Could not get key bytes";
+      Err(Error::new(ErrorKind::Other, message))
+    }
   }
 }
 
 impl From<&EncryptCipher> for OneTimePadEncryptConfig {
   fn from(value: &EncryptCipher) -> Self {
     match value {
-      EncryptCipher::OneTimePad { key, .. } => {
-        OneTimePadEncryptConfig::new(&key.key)
-      }
+      EncryptCipher::OneTimePad {
+        key,
+        raw_input,
+        raw_key,
+        ..
+      } => OneTimePadEncryptConfig::new(
+        key.key.clone(),
+        *raw_input,
+        *raw_key,
+        None,
+        None,
+      ),
       _ => OneTimePadEncryptConfig::default(),
     }
   }
 }
 
+#[derive(Default, PartialEq, Eq)]
 pub struct OneTimePad {
-  bytes: Vec<u8>,
+  pub xor: Xor,
 }
 
 impl Display for OneTimePad {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let hex = self
-      .bytes
-      .iter()
-      .map(|byte| format!("{byte:02x}"))
-      .collect::<Vec<_>>()
-      .join("");
-    write!(f, "{hex}")
+    let xor = &self.xor;
+    write!(f, "{xor}")
   }
 }
 
 impl OneTimePad {
+  pub fn new(xor: Xor) -> Self {
+    Self { xor }
+  }
+
   pub fn encrypt<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
-    config: OneTimePadEncryptConfig,
+    config: &mut OneTimePadEncryptConfig,
   ) -> std::io::Result<Self> {
     let mut plaintext = String::new();
 
     input.read_to_string(&mut plaintext)?;
 
-    config.validate(plaintext.len())?;
+    let alpha = if config.raw_input {
+      Hex::parse_hex(&plaintext).unwrap()
+    } else {
+      plaintext.try_into().unwrap()
+    };
 
-    let alpha = plaintext.as_bytes();
-    let beta = config.key.as_bytes();
-    let bytes = Self::xor(alpha, beta);
-    let otp = Self { bytes };
+    let beta = if config.raw_key {
+      Hex::parse_hex(&config.key).unwrap()
+    } else {
+      config.key.as_str().try_into().unwrap()
+    };
+
+    config.set_alpha(Some(alpha.bytes.clone()));
+    config.set_beta(Some(beta.bytes.clone()));
+
+    config.validate()?;
+
+    let xor = Xor::xor_bytes_padded(&alpha.bytes, &beta.bytes, 0);
+    let otp = Self::new(xor);
 
     write!(output, "{otp}")?;
 
@@ -115,21 +229,32 @@ impl OneTimePad {
   pub fn decrypt<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
-    config: OneTimePadDecryptConfig,
+    config: &mut OneTimePadDecryptConfig,
   ) -> std::io::Result<Self> {
     let mut ciphertext = String::new();
 
     input.read_to_string(&mut ciphertext)?;
 
-    let otp = Self::parse_hex_string(&ciphertext).unwrap();
-
-    config.validate(ciphertext.len())?;
-
     if let Some(key) = &config.key {
-      let alpha = format!("{otp}");
-      let beta = key.as_bytes();
-      let bytes = Self::xor(alpha.as_bytes(), beta);
-      let otp = Self { bytes };
+      let alpha = if config.raw_input {
+        Hex::parse_hex(&ciphertext).unwrap()
+      } else {
+        ciphertext.try_into().unwrap()
+      };
+
+      let beta = if config.raw_key {
+        Hex::parse_hex(key).unwrap()
+      } else {
+        key.as_str().try_into().unwrap()
+      };
+
+      config.set_alpha(Some(alpha.bytes.clone()));
+      config.set_beta(Some(beta.bytes.clone()));
+
+      config.validate()?;
+
+      let xor = Xor::xor_bytes_padded(&alpha.bytes, &beta.bytes, 0);
+      let otp = Self::new(xor);
 
       write!(output, "{otp}")?;
 
@@ -137,55 +262,6 @@ impl OneTimePad {
     }
 
     todo!();
-  }
-
-  fn xor(alpha: &[u8], beta: &[u8]) -> Vec<u8> {
-    let max_len = std::cmp::max(alpha.len(), beta.len());
-    let alpha_padded = alpha.iter().chain(std::iter::repeat(&0)).take(max_len);
-    let beta_padded = beta.iter().chain(std::iter::repeat(&0)).take(max_len);
-
-    alpha_padded.zip(beta_padded).map(|(a, b)| a ^ b).collect()
-  }
-
-  fn parse_hex_string(hex: &str) -> Result<Self, HexParseError> {
-    if hex.len() % 2 != 0 {
-      return Err(HexParseError::InvalidLength);
-    }
-
-    let mut bytes = Vec::new();
-
-    for index in (0..hex.len()).step_by(2) {
-      let hex_pair = &hex[index..index + 2];
-      let byte = u8::from_str_radix(hex_pair, 16)?;
-      bytes.push(byte);
-    }
-
-    Ok(Self { bytes })
-  }
-}
-
-#[derive(Debug)]
-enum HexParseError {
-  InvalidLength,
-  InvalidHex(ParseIntError),
-}
-
-impl std::fmt::Display for HexParseError {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      HexParseError::InvalidLength => {
-        write!(f, "Hex string must have an even length.")
-      }
-      HexParseError::InvalidHex(err) => {
-        write!(f, "Failed to parse hex: {err}")
-      }
-    }
-  }
-}
-
-impl From<ParseIntError> for HexParseError {
-  fn from(err: ParseIntError) -> Self {
-    HexParseError::InvalidHex(err)
   }
 }
 
@@ -200,11 +276,15 @@ mod tests {
     let mut input = Command::get_readable("Hello");
     let mut output = Vec::new();
 
-    let config = OneTimePadEncryptConfig {
+    let mut cfg = OneTimePadEncryptConfig {
       key: String::from("World"),
+      raw_input: false,
+      raw_key: false,
+      alpha: None,
+      beta: None,
     };
 
-    let otp = OneTimePad::encrypt(&mut input, &mut output, config).unwrap();
+    let otp = OneTimePad::encrypt(&mut input, &mut output, &mut cfg).unwrap();
 
     let expected = vec![
       b'H' ^ b'W',
@@ -214,7 +294,7 @@ mod tests {
       b'o' ^ b'd',
     ];
 
-    assert_eq!(otp.bytes, expected);
+    assert_eq!(otp.xor.hex.bytes, expected);
   }
 
   #[test]
@@ -222,11 +302,15 @@ mod tests {
     let mut input = Command::get_readable("Hello");
     let mut output = Vec::new();
 
-    let config = OneTimePadDecryptConfig {
+    let mut cfg = OneTimePadDecryptConfig {
       key: Some(String::from("World")),
+      raw_input: false,
+      raw_key: false,
+      alpha: None,
+      beta: None,
     };
 
-    let otp = OneTimePad::decrypt(&mut input, &mut output, config).unwrap();
+    let otp = OneTimePad::decrypt(&mut input, &mut output, &mut cfg).unwrap();
 
     let expected = vec![
       b'H' ^ b'W',
@@ -236,82 +320,6 @@ mod tests {
       b'o' ^ b'd',
     ];
 
-    assert_eq!(otp.bytes, expected);
-  }
-
-  #[test]
-  fn test_xor() {
-    let alpha = b"Hell0";
-    let beta = b"World";
-
-    let result = OneTimePad::xor(alpha, beta);
-
-    let expected = vec![
-      b'H' ^ b'W',
-      b'e' ^ b'o',
-      b'l' ^ b'r',
-      b'l' ^ b'l',
-      b'o' ^ b'd',
-    ];
-
-    assert_eq!(result, expected);
-  }
-
-  #[test]
-  fn test_otp_display() {
-    let alpha = b"Hello";
-    let beta = b"Hello";
-
-    let bytes = OneTimePad::xor(alpha, beta);
-    let otp = OneTimePad { bytes };
-
-    let result = format!("{otp}");
-    let expected = String::from("0000000000");
-
-    assert_eq!(result, expected);
-  }
-
-  #[test]
-  fn test_parse_hex() {
-    let input = "e508";
-
-    let otp = OneTimePad::parse_hex_string(input).unwrap();
-
-    let expected = vec![229_u8, 8_u8];
-
-    assert_eq!(otp.bytes, expected);
-  }
-
-  #[test]
-  fn test_xor_with_key_longer_than_plaintext() {
-    let plaintext = b"HELLO";
-    let key = b"SECRETKEY";
-
-    let expected_result = vec![27, 0, 15, 30, 10, 84, 75, 69, 89];
-    let result = OneTimePad::xor(plaintext, key);
-
-    assert_eq!(result, expected_result);
-  }
-
-  #[test]
-  fn test_xor_with_plaintext_longer_than_key() {
-    let plaintext = b"HELLOTHERE";
-    let key = b"KEY";
-
-    let expected_result = vec![3, 0, 21, 76, 79, 84, 72, 69, 82, 69];
-    let result = OneTimePad::xor(plaintext, key);
-
-    assert_eq!(result, expected_result);
-  }
-
-  #[test]
-  fn test_xor_with_empty_inputs() {
-    let alpha = b"";
-    let beta = b"";
-
-    let expected_result: Vec<u8> = vec![];
-    let result = OneTimePad::xor(alpha, beta);
-
-    assert_eq!(result, expected_result);
+    assert_eq!(otp.xor.hex.bytes, expected);
   }
 }

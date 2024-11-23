@@ -108,7 +108,7 @@ impl Hex {
       buf.try_into()?
     };
 
-    writeln!(output, "{hex}")?;
+    write!(output, "{hex}")?;
 
     Ok(())
   }
