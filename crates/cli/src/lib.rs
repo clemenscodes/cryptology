@@ -7,6 +7,7 @@ pub mod vigenere;
 pub mod xor;
 
 use clap::{Parser, Subcommand};
+use hex::Hex;
 use xor::Xor;
 
 use std::fs::File;
@@ -153,6 +154,16 @@ pub enum Command {
     output: Option<PathBuf>,
   },
 
+  /// Display and parse an input as a hexadecimal string
+  ///
+  /// Input can be provided from a file or standard input, and
+  /// output can be directed to a file or standard output.
+  #[command(name = "hex")]
+  Hex {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
+  },
+
   /// Encrypt text using a specified cipher.
   #[command(name = "encrypt", visible_aliases = ["enc", "e"])]
   Encrypt {
@@ -268,6 +279,11 @@ impl Command {
       }
       Command::Encrypt { cipher } => cipher.execute(),
       Command::Decrypt { cipher } => cipher.execute(),
+      Command::Hex { default_args } => {
+        let (mut input, mut output) = Command::get_files(default_args);
+        Hex::parse(&mut input, &mut output)?;
+        Ok(())
+      }
     }
   }
 }
