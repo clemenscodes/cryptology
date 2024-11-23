@@ -1,10 +1,13 @@
 pub mod caesar;
 pub mod frequency_analysis;
+pub mod hex;
 pub mod monoalphabetic_substitution;
 pub mod one_time_pad;
 pub mod vigenere;
+pub mod xor;
 
 use clap::{Parser, Subcommand};
+use xor::Xor;
 
 use std::fs::File;
 use std::io::{self, Cursor, Read, Result, Write};
@@ -114,6 +117,42 @@ pub enum Command {
     default_args: CryptologyDefaultArgs,
   },
 
+  /// Perform an XOR operation on two readable input streams
+  ///
+  /// Input can be provided from a file or standard input, and
+  /// output can be directed to a file or standard output.
+  #[command(name = "xor")]
+  Xor {
+    /// Path to the alpha input file.
+    #[arg(
+      short = 'a',
+      long = "alpha",
+      value_name = "ALPHA",
+      help = "Specify the alpha input file"
+    )]
+    alpha: PathBuf,
+
+    /// Path to the beta input file.
+    #[arg(
+      short = 'b',
+      long = "beta",
+      value_name = "BETA",
+      help = "Specify the beta input file"
+    )]
+    beta: PathBuf,
+
+    /// Path to the output file for saving results.
+    ///
+    /// If not provided, outputs to standard output.
+    #[arg(
+      short = 'o',
+      long = "output",
+      value_name = "OUTPUT",
+      help = "Specify the output file for saving result."
+    )]
+    output: Option<PathBuf>,
+  },
+
   /// Encrypt text using a specified cipher.
   #[command(name = "encrypt", visible_aliases = ["enc", "e"])]
   Encrypt {
@@ -221,6 +260,11 @@ impl Command {
         let (mut input, mut output) = Command::get_files(default_args);
         FrequencyAnalyzer::analyze(&mut input, &mut output)?;
         Ok(())
+      }
+      Command::Xor { output, .. } => {
+        let config = self.into();
+        let mut output = Self::create_output(output);
+        Xor::xor(config, &mut output)
       }
       Command::Encrypt { cipher } => cipher.execute(),
       Command::Decrypt { cipher } => cipher.execute(),
