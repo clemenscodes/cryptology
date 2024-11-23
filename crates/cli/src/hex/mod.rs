@@ -141,7 +141,7 @@ impl TryFrom<Box<dyn Read>> for Hex {
     value
       .read_to_end(&mut buffer)
       .map_err(|_| HexParseError::FileReadError)?;
-    Ok(Hex::new(buffer))
+    Ok(Self::new(buffer))
   }
 }
 

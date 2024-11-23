@@ -67,7 +67,7 @@ impl From<&EncryptCipher> for OneTimePadEncryptConfig {
   }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Default, PartialEq, Eq)]
 pub struct OneTimePad {
   pub xor: Xor,
 }
@@ -118,16 +118,26 @@ impl OneTimePad {
     output: &mut W,
     config: &mut OneTimePadDecryptConfig,
   ) -> std::io::Result<()> {
+    for line in Self::decrypt_lines(input, config)? {
+      writeln!(output, "{line}")?;
+    }
+    Ok(())
+  }
+
+  pub fn decrypt_lines<R: Read>(
+    input: &mut R,
+    config: &mut OneTimePadDecryptConfig,
+  ) -> std::io::Result<Vec<String>> {
     let mut ciphertext = String::new();
 
     input.read_to_string(&mut ciphertext)?;
 
-    for line in ciphertext.lines() {
-      let plaintext = Self::decrypt_line(line, config)?;
-      write!(output, "{plaintext}")?;
-    }
+    let decryption: Vec<String> = ciphertext
+      .lines()
+      .map(|line| Self::decrypt_line(line, config).unwrap())
+      .collect();
 
-    Ok(())
+    Ok(decryption)
   }
 
   pub fn decrypt_line(
@@ -150,8 +160,9 @@ impl OneTimePad {
 
     let xor = Xor::xor_bytes_padded(&alpha.bytes, &beta.bytes, 0);
     let otp = Self::new(xor);
+    let fmt = format!("{otp}");
 
-    Ok(format!("{otp}"))
+    Ok(fmt)
   }
 }
 
@@ -176,17 +187,9 @@ mod tests {
 
     OneTimePad::decrypt(&mut input, &mut output, &mut cfg).unwrap();
 
-    let result = Hex::new(output);
+    let result = String::from_utf8(output).unwrap();
 
-    let expected = vec![
-      b'H' ^ b'W',
-      b'e' ^ b'o',
-      b'l' ^ b'r',
-      b'l' ^ b'l',
-      b'o' ^ b'd',
-    ];
-
-    println!("{result}");
+    assert_eq!(result, "1f0a1e000b\n")
   }
 
   #[test]
@@ -246,14 +249,19 @@ mod tests {
     let mut output = Vec::new();
 
     let mut cfg = OneTimePadDecryptConfig {
-      key: Some(plaintext.trim_end().to_string()),
+      key: Some(plaintext),
       raw_input: true,
       raw_key: false,
     };
 
     OneTimePad::decrypt(&mut ciphertext, &mut output, &mut cfg)?;
 
-    println!("{output:#?}");
+    let result = String::from_utf8(output).unwrap();
+
+    let expected = std::fs::read(&output_path)?;
+    let expected = String::from_utf8(expected).unwrap();
+
+    assert_eq!(result, expected);
 
     Ok(())
   }
