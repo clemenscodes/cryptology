@@ -344,4 +344,42 @@ mod tests {
 
     assert_eq!(otp_err.to_string(), message);
   }
+
+  #[test]
+  fn test_otp_example() {
+    let mut input = Command::get_readable("attack at dawn");
+    let mut output = Vec::new();
+
+    let ciphertext = String::from("09e1c5f70a65ac519458e7e53f36");
+
+    let mut cfg = OneTimePadEncryptConfig {
+      key: ciphertext,
+      raw_input: false,
+      raw_key: true,
+      alpha: None,
+      beta: None,
+    };
+
+    let key = OneTimePad::encrypt(&mut input, &mut output, &mut cfg).unwrap();
+
+    let mut input = Command::get_readable("attack at dusk");
+
+    let key = format!("{key}");
+
+    let mut cfg = OneTimePadEncryptConfig {
+      key,
+      raw_input: false,
+      raw_key: true,
+      alpha: None,
+      beta: None,
+    };
+
+    let otp = OneTimePad::encrypt(&mut input, &mut output, &mut cfg).unwrap();
+
+    let result = format!("{otp}");
+
+    let expected = "09e1c5f70a65ac519458e7f13b33";
+
+    assert_eq!(result, expected)
+  }
 }
