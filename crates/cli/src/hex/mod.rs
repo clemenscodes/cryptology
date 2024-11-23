@@ -83,7 +83,7 @@ impl From<&Command> for HexConfig {
   }
 }
 
-#[derive(Default, PartialEq, Eq, Debug)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Hex {
   pub bytes: Vec<u8>,
 }

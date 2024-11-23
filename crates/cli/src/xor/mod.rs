@@ -46,7 +46,7 @@ impl From<&Command> for XorConfig {
   }
 }
 
-#[derive(Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct Xor {
   pub hex: Hex,
 }

@@ -175,7 +175,7 @@ impl From<&EncryptCipher> for OneTimePadEncryptConfig {
   }
 }
 
-#[derive(Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct OneTimePad {
   pub xor: Xor,
 }
@@ -321,5 +321,27 @@ mod tests {
     ];
 
     assert_eq!(otp.xor.hex.bytes, expected);
+  }
+
+  #[test]
+  fn test_otp_decrypt_key_length_too_short() {
+    let mut input = Command::get_readable("ABC");
+    let mut output = Vec::new();
+
+    let mut cfg = OneTimePadDecryptConfig {
+      key: Some(String::from("0000")),
+      raw_input: false,
+      raw_key: true,
+      alpha: None,
+      beta: None,
+    };
+
+    let otp = OneTimePad::decrypt(&mut input, &mut output, &mut cfg);
+
+    let otp_err = otp.unwrap_err();
+
+    let message = "Key must not have less bytes than the input";
+
+    assert_eq!(otp_err.to_string(), message);
   }
 }
