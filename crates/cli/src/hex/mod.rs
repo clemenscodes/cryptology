@@ -5,6 +5,8 @@ use std::{
   path::PathBuf,
 };
 
+use crate::Command;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum HexParseError {
   InvalidLength,
@@ -61,6 +63,26 @@ impl From<HexParseError> for std::io::Error {
   }
 }
 
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct HexConfig {
+  raw: bool,
+}
+
+impl HexConfig {
+  pub fn new(raw: bool) -> Self {
+    Self { raw }
+  }
+}
+
+impl From<&Command> for HexConfig {
+  fn from(value: &Command) -> Self {
+    match value {
+      Command::Hex { raw, .. } => Self::new(*raw),
+      _ => Self::default(),
+    }
+  }
+}
+
 #[derive(Default, PartialEq, Eq, Debug)]
 pub struct Hex {
   pub bytes: Vec<u8>,
@@ -74,12 +96,17 @@ impl Hex {
   pub fn parse<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
+    config: HexConfig,
   ) -> Result<(), HexParseError> {
     let mut buf = String::new();
 
     input.read_to_string(&mut buf)?;
 
-    let hex: Self = buf.try_into()?;
+    let hex: Self = if config.raw {
+      Self::parse_hex(&buf)?
+    } else {
+      buf.try_into()?
+    };
 
     writeln!(output, "{hex}")?;
 

@@ -6,20 +6,21 @@ use crate::{hex::Hex, Command};
 pub struct XorConfig {
   alpha: PathBuf,
   beta: PathBuf,
+  raw: bool,
 }
 
 impl XorConfig {
-  pub fn new(alpha: PathBuf, beta: PathBuf) -> Self {
-    Self { alpha, beta }
+  pub fn new(alpha: PathBuf, beta: PathBuf, raw: bool) -> Self {
+    Self { alpha, beta, raw }
   }
 }
 
 impl From<&Command> for XorConfig {
   fn from(value: &Command) -> Self {
     match value {
-      Command::Xor { alpha, beta, .. } => {
-        Self::new(alpha.to_path_buf(), beta.to_path_buf())
-      }
+      Command::Xor {
+        alpha, beta, raw, ..
+      } => Self::new(alpha.to_path_buf(), beta.to_path_buf(), *raw),
       _ => Self::default(),
     }
   }
@@ -41,6 +42,14 @@ impl Xor {
   ) -> std::io::Result<()> {
     let alpha = std::fs::read(config.alpha)?;
     let beta = std::fs::read(config.beta)?;
+
+    let alpha = if config.raw {
+      let alpha = String::from_utf8(alpha).unwrap();
+      Hex::parse_hex(&alpha).unwrap().bytes
+    } else {
+      let hex: Hex = alpha.try_into().unwrap();
+      hex.bytes
+    };
 
     let xor = Self::xor_bytes_padded(&alpha, &beta, 0);
 

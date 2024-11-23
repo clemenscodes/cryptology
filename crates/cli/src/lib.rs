@@ -152,6 +152,15 @@ pub enum Command {
       help = "Specify the output file for saving result."
     )]
     output: Option<PathBuf>,
+
+    /// Treat input as raw hex string
+    #[arg(
+      short = 'r',
+      long = "raw",
+      value_name = "OUTPUT",
+      help = "Treats the input as raw hex"
+    )]
+    raw: bool,
   },
 
   /// Display and parse an input as a hexadecimal string
@@ -162,6 +171,15 @@ pub enum Command {
   Hex {
     #[command(flatten)]
     default_args: CryptologyDefaultArgs,
+
+    /// Treat input as raw hex string
+    #[arg(
+      short = 'r',
+      long = "raw",
+      value_name = "OUTPUT",
+      help = "Treats the input as raw hex"
+    )]
+    raw: bool,
   },
 
   /// Encrypt text using a specified cipher.
@@ -279,9 +297,10 @@ impl Command {
       }
       Command::Encrypt { cipher } => cipher.execute(),
       Command::Decrypt { cipher } => cipher.execute(),
-      Command::Hex { default_args } => {
+      Command::Hex { default_args, .. } => {
         let (mut input, mut output) = Command::get_files(default_args);
-        Hex::parse(&mut input, &mut output)?;
+        let config = self.into();
+        Hex::parse(&mut input, &mut output, config)?;
         Ok(())
       }
     }
