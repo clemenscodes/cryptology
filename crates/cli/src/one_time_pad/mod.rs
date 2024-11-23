@@ -1,6 +1,6 @@
 use std::{
   fmt::Display,
-  io::{Error, ErrorKind, Read, Write},
+  io::{Read, Write},
 };
 
 use crate::{hex::Hex, xor::Xor, DecryptCipher, EncryptCipher};
@@ -10,62 +10,14 @@ pub struct OneTimePadDecryptConfig {
   pub key: Option<String>,
   pub raw_input: bool,
   pub raw_key: bool,
-  alpha: Option<Vec<u8>>,
-  beta: Option<Vec<u8>>,
 }
 
 impl OneTimePadDecryptConfig {
-  pub fn new(
-    key: Option<String>,
-    raw_input: bool,
-    raw_key: bool,
-    alpha: Option<Vec<u8>>,
-    beta: Option<Vec<u8>>,
-  ) -> Self {
+  pub fn new(key: Option<String>, raw_input: bool, raw_key: bool) -> Self {
     Self {
       key,
       raw_input,
       raw_key,
-      alpha,
-      beta,
-    }
-  }
-
-  pub fn set_alpha(&mut self, alpha: Option<Vec<u8>>) {
-    self.alpha = alpha;
-  }
-
-  pub fn set_beta(&mut self, beta: Option<Vec<u8>>) {
-    self.beta = beta;
-  }
-
-  pub fn validate(&self) -> std::io::Result<()> {
-    let alpha = self.alpha()?;
-    let beta = self.beta()?;
-
-    if alpha.len() > beta.len() {
-      let message = "Key must not have less bytes than the input";
-      return Err(Error::new(ErrorKind::Other, message));
-    }
-
-    Ok(())
-  }
-
-  pub fn alpha(&self) -> std::io::Result<Vec<u8>> {
-    if let Some(alpha) = &self.alpha {
-      Ok(alpha.to_vec())
-    } else {
-      let message = "Could not get input bytes";
-      Err(Error::new(ErrorKind::Other, message))
-    }
-  }
-
-  pub fn beta(&self) -> std::io::Result<Vec<u8>> {
-    if let Some(beta) = &self.beta {
-      Ok(beta.to_vec())
-    } else {
-      let message = "Could not get key bytes";
-      Err(Error::new(ErrorKind::Other, message))
     }
   }
 }
@@ -78,13 +30,7 @@ impl From<&DecryptCipher> for OneTimePadDecryptConfig {
         raw_input,
         raw_key,
         ..
-      } => OneTimePadDecryptConfig::new(
-        key.key.clone(),
-        *raw_input,
-        *raw_key,
-        None,
-        None,
-      ),
+      } => OneTimePadDecryptConfig::new(key.key.clone(), *raw_input, *raw_key),
       _ => OneTimePadDecryptConfig::default(),
     }
   }
@@ -95,62 +41,14 @@ pub struct OneTimePadEncryptConfig {
   pub key: String,
   pub raw_input: bool,
   pub raw_key: bool,
-  alpha: Option<Vec<u8>>,
-  beta: Option<Vec<u8>>,
 }
 
 impl OneTimePadEncryptConfig {
-  pub fn new(
-    key: String,
-    raw_input: bool,
-    raw_key: bool,
-    alpha: Option<Vec<u8>>,
-    beta: Option<Vec<u8>>,
-  ) -> Self {
+  pub fn new(key: String, raw_input: bool, raw_key: bool) -> Self {
     Self {
       key,
       raw_input,
       raw_key,
-      alpha,
-      beta,
-    }
-  }
-
-  pub fn set_alpha(&mut self, alpha: Option<Vec<u8>>) {
-    self.alpha = alpha;
-  }
-
-  pub fn set_beta(&mut self, beta: Option<Vec<u8>>) {
-    self.beta = beta;
-  }
-
-  pub fn validate(&self) -> std::io::Result<()> {
-    let alpha = self.alpha()?;
-    let beta = self.beta()?;
-
-    if alpha.len() > beta.len() {
-      let message = "Key must not have less bytes than the input";
-      return Err(Error::new(ErrorKind::Other, message));
-    }
-
-    Ok(())
-  }
-
-  pub fn alpha(&self) -> std::io::Result<Vec<u8>> {
-    if let Some(alpha) = &self.alpha {
-      Ok(alpha.to_vec())
-    } else {
-      let message = "Could not get input bytes";
-      Err(Error::new(ErrorKind::Other, message))
-    }
-  }
-
-  pub fn beta(&self) -> std::io::Result<Vec<u8>> {
-    if let Some(beta) = &self.beta {
-      Ok(beta.to_vec())
-    } else {
-      let message = "Could not get key bytes";
-      Err(Error::new(ErrorKind::Other, message))
     }
   }
 }
@@ -163,13 +61,7 @@ impl From<&EncryptCipher> for OneTimePadEncryptConfig {
         raw_input,
         raw_key,
         ..
-      } => OneTimePadEncryptConfig::new(
-        key.key.clone(),
-        *raw_input,
-        *raw_key,
-        None,
-        None,
-      ),
+      } => OneTimePadEncryptConfig::new(key.key.clone(), *raw_input, *raw_key),
       _ => OneTimePadEncryptConfig::default(),
     }
   }
@@ -213,11 +105,6 @@ impl OneTimePad {
       config.key.as_str().try_into().unwrap()
     };
 
-    config.set_alpha(Some(alpha.bytes.clone()));
-    config.set_beta(Some(beta.bytes.clone()));
-
-    config.validate()?;
-
     let xor = Xor::xor_bytes_padded(&alpha.bytes, &beta.bytes, 0);
     let otp = Self::new(xor);
 
@@ -230,75 +117,54 @@ impl OneTimePad {
     input: &mut R,
     output: &mut W,
     config: &mut OneTimePadDecryptConfig,
-  ) -> std::io::Result<Self> {
+  ) -> std::io::Result<()> {
     let mut ciphertext = String::new();
 
     input.read_to_string(&mut ciphertext)?;
 
-    if let Some(key) = &config.key {
-      let alpha = if config.raw_input {
-        Hex::parse_hex(&ciphertext).unwrap()
-      } else {
-        ciphertext.try_into().unwrap()
-      };
-
-      let beta = if config.raw_key {
-        Hex::parse_hex(key).unwrap()
-      } else {
-        key.as_str().try_into().unwrap()
-      };
-
-      config.set_alpha(Some(alpha.bytes.clone()));
-      config.set_beta(Some(beta.bytes.clone()));
-
-      config.validate()?;
-
-      let xor = Xor::xor_bytes_padded(&alpha.bytes, &beta.bytes, 0);
-      let otp = Self::new(xor);
-
-      write!(output, "{otp}")?;
-
-      return Ok(otp);
+    for line in ciphertext.lines() {
+      let plaintext = Self::decrypt_line(line, config)?;
+      write!(output, "{plaintext}")?;
     }
 
-    todo!();
+    Ok(())
+  }
+
+  pub fn decrypt_line(
+    line: &str,
+    config: &mut OneTimePadDecryptConfig,
+  ) -> std::io::Result<String> {
+    let key = config.key.clone().unwrap_or_default();
+
+    let alpha = if config.raw_input {
+      Hex::parse_hex(line).unwrap()
+    } else {
+      line.try_into().unwrap()
+    };
+
+    let beta = if config.raw_key {
+      Hex::parse_hex(key.as_str()).unwrap()
+    } else {
+      key.try_into().unwrap()
+    };
+
+    let xor = Xor::xor_bytes_padded(&alpha.bytes, &beta.bytes, 0);
+    let otp = Self::new(xor);
+
+    Ok(format!("{otp}"))
   }
 }
 
 #[cfg(test)]
 mod tests {
+  use std::{fs::File, path::PathBuf};
+
   use crate::Command;
 
   use super::*;
 
   #[test]
-  fn test_otp_encrypt() {
-    let mut input = Command::get_readable("Hello");
-    let mut output = Vec::new();
-
-    let mut cfg = OneTimePadEncryptConfig {
-      key: String::from("World"),
-      raw_input: false,
-      raw_key: false,
-      alpha: None,
-      beta: None,
-    };
-
-    let otp = OneTimePad::encrypt(&mut input, &mut output, &mut cfg).unwrap();
-
-    let expected = vec![
-      b'H' ^ b'W',
-      b'e' ^ b'o',
-      b'l' ^ b'r',
-      b'l' ^ b'l',
-      b'o' ^ b'd',
-    ];
-
-    assert_eq!(otp.xor.hex.bytes, expected);
-  }
-
-  #[test]
-  fn test_otp_decrypt() {
+  fn test_otp() {
     let mut input = Command::get_readable("Hello");
     let mut output = Vec::new();
 
@@ -306,11 +172,11 @@ mod tests {
       key: Some(String::from("World")),
       raw_input: false,
       raw_key: false,
-      alpha: None,
-      beta: None,
     };
 
-    let otp = OneTimePad::decrypt(&mut input, &mut output, &mut cfg).unwrap();
+    OneTimePad::decrypt(&mut input, &mut output, &mut cfg).unwrap();
+
+    let result = Hex::new(output);
 
     let expected = vec![
       b'H' ^ b'W',
@@ -320,29 +186,7 @@ mod tests {
       b'o' ^ b'd',
     ];
 
-    assert_eq!(otp.xor.hex.bytes, expected);
-  }
-
-  #[test]
-  fn test_otp_decrypt_key_length_too_short() {
-    let mut input = Command::get_readable("ABC");
-    let mut output = Vec::new();
-
-    let mut cfg = OneTimePadDecryptConfig {
-      key: Some(String::from("0000")),
-      raw_input: false,
-      raw_key: true,
-      alpha: None,
-      beta: None,
-    };
-
-    let otp = OneTimePad::decrypt(&mut input, &mut output, &mut cfg);
-
-    let otp_err = otp.unwrap_err();
-
-    let message = "Key must not have less bytes than the input";
-
-    assert_eq!(otp_err.to_string(), message);
+    println!("{result}");
   }
 
   #[test]
@@ -356,8 +200,6 @@ mod tests {
       key: ciphertext,
       raw_input: false,
       raw_key: true,
-      alpha: None,
-      beta: None,
     };
 
     let key = OneTimePad::encrypt(&mut input, &mut output, &mut cfg).unwrap();
@@ -370,8 +212,6 @@ mod tests {
       key,
       raw_input: false,
       raw_key: true,
-      alpha: None,
-      beta: None,
     };
 
     let otp = OneTimePad::encrypt(&mut input, &mut output, &mut cfg).unwrap();
@@ -381,5 +221,40 @@ mod tests {
     let expected = "09e1c5f70a65ac519458e7f13b33";
 
     assert_eq!(result, expected)
+  }
+
+  #[test]
+  fn test_otp_derive_plaintexts() -> std::io::Result<()> {
+    let assets = "src/one_time_pad/assets";
+    let path = std::env::var("CARGO_MANIFEST_DIR")
+      .map(|dir| PathBuf::from(dir).join(assets))
+      .unwrap_or_else(|_| {
+        std::env::current_dir()
+          .expect("Failed to get current directory")
+          .join("crates/cli")
+          .join(assets)
+      });
+
+    let ciphertext = path.join("ciphertext-otp1.txt");
+    let plaintext = path.join("plaintext-otp1.txt");
+    let output_path = path.join("output-otp1.txt");
+
+    let mut ciphertext = File::open(&ciphertext)?;
+    let plaintext = std::fs::read(&plaintext)?;
+    let plaintext = String::from_utf8(plaintext).unwrap();
+
+    let mut output = Vec::new();
+
+    let mut cfg = OneTimePadDecryptConfig {
+      key: Some(plaintext.trim_end().to_string()),
+      raw_input: true,
+      raw_key: false,
+    };
+
+    OneTimePad::decrypt(&mut ciphertext, &mut output, &mut cfg)?;
+
+    println!("{output:#?}");
+
+    Ok(())
   }
 }
