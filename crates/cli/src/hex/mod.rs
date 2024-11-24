@@ -66,18 +66,19 @@ impl From<HexParseError> for std::io::Error {
 #[derive(Default, Debug, PartialEq, Eq)]
 pub struct HexConfig {
   raw: bool,
+  to_ascii: bool,
 }
 
 impl HexConfig {
-  pub fn new(raw: bool) -> Self {
-    Self { raw }
+  pub fn new(raw: bool, to_ascii: bool) -> Self {
+    Self { raw, to_ascii }
   }
 }
 
 impl From<&Command> for HexConfig {
   fn from(value: &Command) -> Self {
     match value {
-      Command::Hex { raw, .. } => Self::new(*raw),
+      Command::Hex { raw, to_ascii, .. } => Self::new(*raw, *to_ascii),
       _ => Self::default(),
     }
   }
@@ -108,7 +109,12 @@ impl Hex {
       buf.try_into()?
     };
 
-    write!(output, "{hex}")?;
+    if config.to_ascii {
+      let ascii = hex.to_ascii();
+      writeln!(output, "{ascii}")?;
+    } else {
+      writeln!(output, "{hex}")?;
+    }
 
     Ok(())
   }
@@ -130,6 +136,20 @@ impl Hex {
     } else {
       Err(HexParseError::InvalidHex)
     }
+  }
+
+  pub fn to_ascii(&self) -> String {
+    self
+      .bytes
+      .iter()
+      .map(|&b| {
+        if b.is_ascii_graphic() || b.is_ascii_whitespace() {
+          b as char
+        } else {
+          '.'
+        }
+      })
+      .collect()
   }
 }
 
@@ -258,5 +278,27 @@ mod tests {
     assert!(Hex::is_valid_hex("DEADBEEF"));
     assert!(!Hex::is_valid_hex("deadbee"));
     assert!(!Hex::is_valid_hex("deadg123"));
+  }
+
+  #[test]
+  fn test_to_ascii() {
+    let hex = Hex::new(vec![
+      72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33,
+    ]);
+    assert_eq!(hex.to_ascii(), "Hello, World!");
+
+    let hex = Hex::new(vec![
+      72, 101, 108, 108, 111, 0xFF, 44, 32, 87, 111, 114, 108, 100, 33,
+    ]);
+    assert_eq!(hex.to_ascii(), "Hello., World!");
+
+    let hex = Hex::new(vec![]);
+    assert_eq!(hex.to_ascii(), "");
+
+    let hex = Hex::new(vec![0x80, 0xFF, 0xAB]);
+    assert_eq!(hex.to_ascii(), "...");
+
+    let hex = Hex::new(vec![9, 10, 32, 65, 66, 67]);
+    assert_eq!(hex.to_ascii(), "\t\n ABC");
   }
 }

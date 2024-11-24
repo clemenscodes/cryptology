@@ -189,6 +189,15 @@ pub enum Command {
       help = "Treats the input as raw hex"
     )]
     raw: bool,
+
+    /// Print result as ASCII
+    #[arg(
+      short = 'a',
+      long = "ascii",
+      value_name = "ASCII",
+      help = "Print the result as ASCII"
+    )]
+    to_ascii: bool,
   },
 
   /// Encrypt text using a specified cipher.

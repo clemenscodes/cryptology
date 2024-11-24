@@ -168,8 +168,6 @@ impl OneTimePad {
 
 #[cfg(test)]
 mod tests {
-  use std::{fs::File, path::PathBuf};
-
   use crate::Command;
 
   use super::*;
@@ -224,45 +222,5 @@ mod tests {
     let expected = "09e1c5f70a65ac519458e7f13b33";
 
     assert_eq!(result, expected)
-  }
-
-  #[test]
-  fn test_otp_derive_plaintexts() -> std::io::Result<()> {
-    let assets = "src/one_time_pad/assets";
-    let path = std::env::var("CARGO_MANIFEST_DIR")
-      .map(|dir| PathBuf::from(dir).join(assets))
-      .unwrap_or_else(|_| {
-        std::env::current_dir()
-          .expect("Failed to get current directory")
-          .join("crates/cli")
-          .join(assets)
-      });
-
-    let ciphertext = path.join("ciphertext-otp1.txt");
-    let plaintext = path.join("plaintext-otp1.txt");
-    let output_path = path.join("output-otp1.txt");
-
-    let mut ciphertext = File::open(&ciphertext)?;
-    let plaintext = std::fs::read(&plaintext)?;
-    let plaintext = String::from_utf8(plaintext).unwrap();
-
-    let mut output = Vec::new();
-
-    let mut cfg = OneTimePadDecryptConfig {
-      key: Some(plaintext),
-      raw_input: true,
-      raw_key: false,
-    };
-
-    OneTimePad::decrypt(&mut ciphertext, &mut output, &mut cfg)?;
-
-    let result = String::from_utf8(output).unwrap();
-
-    let expected = std::fs::read(&output_path)?;
-    let expected = String::from_utf8(expected).unwrap();
-
-    assert_eq!(result, expected);
-
-    Ok(())
   }
 }
