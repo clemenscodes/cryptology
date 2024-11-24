@@ -111,9 +111,9 @@ impl Hex {
 
     if config.to_ascii {
       let ascii = hex.to_ascii();
-      writeln!(output, "{ascii}")?;
+      write!(output, "{ascii}")?;
     } else {
-      writeln!(output, "{hex}")?;
+      write!(output, "{hex}")?;
     }
 
     Ok(())
