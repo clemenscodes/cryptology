@@ -1,13 +1,13 @@
 use rayon::prelude::*;
 
 use std::{
-  io::{Cursor, Read, Result, Write},
+  io::{Read, Result, Write},
   sync::{Arc, Mutex},
 };
 
 use crate::{
-  caesar::Caesar, frequency_analysis::FrequencyAnalyzer, DecryptCipher,
-  EncryptCipher,
+  caesar::Caesar, frequency_analysis::FrequencyAnalyzer, Command,
+  DecryptCipher, EncryptCipher,
 };
 
 pub struct VigenereDecryptConfig {
@@ -53,9 +53,11 @@ impl From<&DecryptCipher> for VigenereDecryptConfig {
         key_length,
         max_key_length,
         ..
-      } => {
-        VigenereDecryptConfig::new(key.clone(), *key_length, *max_key_length)
-      }
+      } => VigenereDecryptConfig::new(
+        key.key.clone(),
+        *key_length,
+        *max_key_length,
+      ),
       _ => VigenereDecryptConfig::default(),
     }
   }
@@ -84,7 +86,9 @@ impl Default for VigenereEncryptConfig {
 impl From<&EncryptCipher> for VigenereEncryptConfig {
   fn from(value: &EncryptCipher) -> Self {
     match value {
-      EncryptCipher::Vigenere { key, .. } => VigenereEncryptConfig::new(key),
+      EncryptCipher::Vigenere { key, .. } => {
+        VigenereEncryptConfig::new(&key.key)
+      }
       _ => VigenereEncryptConfig::default(),
     }
   }
@@ -133,7 +137,7 @@ impl Vigenere {
   }
 
   fn decrypt_line(line: &str, config: &VigenereDecryptConfig) -> String {
-    let mut input = Self::get_readable(line);
+    let mut input = Command::get_readable(line);
     let mut output = Vec::new();
 
     let result = if let Some(key) = &config.key {
@@ -184,16 +188,16 @@ impl Vigenere {
     let mut content = String::new();
     input.read_to_string(&mut content)?;
     let mut shifts: Vec<u8> = Vec::new();
-    let mut buf = Self::get_readable(&content);
+    let mut buf = Command::get_readable(&content);
     let caesars = Vigenere::caesar_segments(&mut buf, key_length)?;
 
     for caesar in &caesars {
-      let mut buf = Self::get_readable(caesar);
+      let mut buf = Command::get_readable(caesar);
       let (_, shift) = Caesar::find_best_shift(&mut buf)?;
       shifts.push(shift);
     }
 
-    let mut input = Self::get_readable(&content);
+    let mut input = Command::get_readable(&content);
     let mut buf = Vec::new();
     let key = Self::derive_key(shifts);
     Vigenere::decrypt_with_key(&mut input, &mut buf, &key)?;
@@ -215,21 +219,21 @@ impl Vigenere {
 
     (2..=max_key_length).into_par_iter().for_each(|key_length| {
       let mut shifts = vec![0u8; key_length as usize];
-      let mut input = Self::get_readable(&content);
+      let mut input = Command::get_readable(&content);
       let caesars = Self::caesar_segments(&mut input, key_length).unwrap();
 
       caesars.into_iter().enumerate().for_each(|(index, caesar)| {
-        let mut buf = Self::get_readable(&caesar);
+        let mut buf = Command::get_readable(&caesar);
         let (_, s) = Caesar::find_best_shift(&mut buf).unwrap();
         shifts[index] = s;
       });
 
       let key = Self::derive_key(shifts);
       let mut buf = Vec::new();
-      let mut input = Self::get_readable(&content);
+      let mut input = Command::get_readable(&content);
       Self::decrypt_with_key(&mut input, &mut buf, &key).unwrap();
       let candidate = String::from_utf8(buf).unwrap();
-      let mut input = Self::get_readable(&candidate);
+      let mut input = Command::get_readable(&candidate);
 
       if let Ok(score) = FrequencyAnalyzer::score_text(&mut input) {
         let local_best_result = (candidate.clone(), score);
@@ -264,10 +268,6 @@ impl Vigenere {
     }
 
     Ok(caesars)
-  }
-
-  fn get_readable(input: &str) -> Cursor<Vec<u8>> {
-    Cursor::new(input.as_bytes().to_vec())
   }
 
   fn derive_key(shifts: Vec<u8>) -> String {
