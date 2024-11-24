@@ -1,6 +1,7 @@
 pub mod caesar;
 pub mod frequency_analysis;
 pub mod hex;
+pub mod many_time_pad;
 pub mod monoalphabetic_substitution;
 pub mod one_time_pad;
 pub mod vigenere;
@@ -8,6 +9,7 @@ pub mod xor;
 
 use clap::{Parser, Subcommand};
 use hex::Hex;
+use many_time_pad::ManyTimePad;
 use xor::Xor;
 
 use std::fs::File;
@@ -307,7 +309,7 @@ pub enum DecryptCipher {
     max_key_length: Option<u8>,
   },
 
-  /// Use the One-Time-Pad cipher for decryption.
+  /// Decrypt One Time Pad (only possible if vulnerable)
   #[command(name = "one-time-pad", visible_alias = "otp")]
   OneTimePad {
     #[command(flatten)]
@@ -333,6 +335,13 @@ pub enum DecryptCipher {
       help = "Treats the key as raw hex"
     )]
     raw_key: bool,
+  },
+
+  /// Decrypt Many Time Pad
+  #[command(name = "many-time-pad", visible_alias = "mtp")]
+  ManyTimePad {
+    #[command(flatten)]
+    default_args: CryptologyDefaultArgs,
   },
 }
 
@@ -403,6 +412,11 @@ impl DecryptCipher {
         let (mut input, mut output) = Command::get_files(default_args);
         let mut config = self.into();
         OneTimePad::decrypt(&mut input, &mut output, &mut config)?;
+        Ok(())
+      }
+      DecryptCipher::ManyTimePad { default_args, .. } => {
+        let (mut input, mut output) = Command::get_files(default_args);
+        ManyTimePad::decrypt(&mut input, &mut output)?;
         Ok(())
       }
     }
