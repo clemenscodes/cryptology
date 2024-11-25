@@ -7,6 +7,12 @@ use crate::{hex::Hex, xor::Xor};
 
 pub type XorCombination = BTreeMap<(usize, usize), Xor>;
 
+pub type PlaintextCandidates = BTreeMap<(usize, usize), BTreeMap<u8, usize>>;
+
+pub type PlaintextDeductions = BTreeMap<(usize, usize), u8>;
+
+const SPACE: u8 = 0x20;
+
 #[derive(Default, PartialEq, Eq)]
 pub struct ManyTimePad {
   combination: XorCombination,
@@ -31,28 +37,19 @@ impl ManyTimePad {
       .collect();
 
     let combinations = Self::xor_all_combinations(&ciphertexts, 0x00);
+    let candidates = Self::candidates(&combinations, &ciphertexts);
+    let deductions = Self::deduce_plaintexts(candidates);
+    let plaintexts = Self::get_plaintexts(deductions);
 
-    // combinations.iter().for_each(|(_, xor)| println!("{xor}"));
-
-    let candidates = Self::combined_candidates(&combinations);
-
-    candidates
-      .iter()
-      .for_each(|(_, candidate)| println!("{candidate:#?}"));
-
-    // let key = Self::deduce_key(&candidates, &ciphertexts);
-    // let plaintexts = Self::decrypt_with_key(&ciphertexts, &key);
-
-    // for plaintext in plaintexts {
-    //   writeln!(output, "{plaintext}")?;
-    // }
+    for plaintext in plaintexts {
+      writeln!(output, "{plaintext}")?;
+    }
 
     Ok(())
   }
 
   pub fn get_candidate(byte: u8) -> u8 {
-    let space = 0x20;
-    byte ^ space
+    byte ^ SPACE
   }
 
   pub fn is_space_candidate(byte: u8) -> bool {
@@ -76,76 +73,93 @@ impl ManyTimePad {
     results
   }
 
-  pub fn combined_candidates(
+  pub fn candidates(
     combinations: &XorCombination,
-  ) -> BTreeMap<(usize, usize), Vec<Option<u8>>> {
-    combinations
-      .iter()
-      .map(|(&(i, j), xor)| {
-        let candidates = Self::map_plaintext_candidates(xor.bytes());
-        ((i, j), candidates)
-      })
-      .collect()
-  }
-
-  fn map_plaintext_candidates(xor_result: &[u8]) -> Vec<Option<u8>> {
-    xor_result
-      .iter()
-      .map(|&byte| {
-        if Self::is_space_candidate(byte) {
-          Some(Self::get_candidate(byte))
-        } else {
-          None
-        }
-      })
-      .collect()
-  }
-
-  pub fn deduce_key(
-    combined_candidates: &BTreeMap<(usize, usize), Vec<Option<u8>>>,
     ciphertexts: &[Vec<u8>],
-  ) -> Vec<Option<u8>> {
-    let max_len = ciphertexts.iter().map(|c| c.len()).max().unwrap_or(0);
-    let mut key: Vec<Option<u8>> = vec![None; max_len];
+  ) -> PlaintextCandidates {
+    let mut candidates: PlaintextCandidates = BTreeMap::new();
 
-    for ((i, j), candidates) in combined_candidates {
-      let c1 = &ciphertexts[*i];
-      let c2 = &ciphertexts[*j];
+    for (&(i, j), xor) in combinations {
+      let xor_bytes = xor.bytes();
 
-      for (pos, &candidate) in candidates.iter().enumerate() {
-        if let Some(plaintext_byte) = candidate {
-          if pos < c1.len() {
-            let k1 = c1[pos] ^ plaintext_byte;
-            key[pos] = Some(k1);
-          }
+      for (pos, &byte) in xor_bytes.iter().enumerate() {
+        if pos >= ciphertexts[i].len() || pos >= ciphertexts[j].len() {
+          continue;
+        }
 
-          if pos < c2.len() {
-            let k2 = c2[pos] ^ plaintext_byte;
-            key[pos] = Some(k2);
-          }
+        if !Self::is_space_candidate(byte) {
+          continue;
+        }
+
+        let p2 = Self::get_candidate(byte);
+
+        if p2.is_ascii_graphic() || p2 == SPACE {
+          *candidates
+            .entry((i, pos))
+            .or_default()
+            .entry(SPACE)
+            .or_insert(0) += 1;
+
+          *candidates
+            .entry((j, pos))
+            .or_default()
+            .entry(p2)
+            .or_insert(0) += 1;
+        }
+
+        let p1 = Self::get_candidate(byte);
+
+        if p1.is_ascii_graphic() || p1 == SPACE {
+          *candidates
+            .entry((i, pos))
+            .or_default()
+            .entry(p1)
+            .or_insert(0) += 1;
+
+          *candidates
+            .entry((j, pos))
+            .or_default()
+            .entry(SPACE)
+            .or_insert(0) += 1;
         }
       }
     }
 
-    key
+    candidates
   }
 
-  pub fn decrypt_with_key(
-    ciphertexts: &[Vec<u8>],
-    key: &[Option<u8>],
-  ) -> Vec<String> {
-    ciphertexts
-      .iter()
-      .map(|ciphertext| {
-        ciphertext
-          .iter()
-          .enumerate()
-          .map(|(i, &byte)| match key.get(i).and_then(|&k| k) {
-            Some(k) => (byte ^ k) as char,
-            None => '*',
-          })
-          .collect()
+  pub fn deduce_plaintexts(
+    candidates: PlaintextCandidates,
+  ) -> PlaintextDeductions {
+    candidates
+      .into_iter()
+      .filter_map(|((ciphertext_index, pos), char_counts)| {
+        char_counts
+          .into_iter()
+          .max_by_key(|&(_, count)| count)
+          .map(|(byte, _)| ((ciphertext_index, pos), byte))
       })
+      .collect()
+  }
+
+  pub fn get_plaintexts(deductions: PlaintextDeductions) -> Vec<String> {
+    let mut plaintexts: Vec<Vec<char>> = vec![];
+
+    for ((plaintext_index, character_index), &byte) in deductions.iter() {
+      if plaintexts.len() <= *plaintext_index {
+        plaintexts.resize(*plaintext_index + 1, Vec::new());
+      }
+
+      if plaintexts[*plaintext_index].len() <= *character_index {
+        plaintexts[*plaintext_index].resize(*character_index + 1, ' ');
+      }
+
+      plaintexts[*plaintext_index][*character_index] = byte as char;
+    }
+
+    plaintexts
+      .into_iter()
+      .map(|chars| chars.into_iter().collect())
       .collect()
   }
 }
@@ -194,25 +208,24 @@ mod tests {
   }
 
   #[test]
-  fn test_map_plaintext_candidates() {
-    let xor_result = vec![b'A', b'a', b'.'];
-    let candidates = ManyTimePad::map_plaintext_candidates(&xor_result);
-    assert_eq!(candidates[0], Some(b'a'));
-    assert_eq!(candidates[1], Some(b'A'));
-    assert_eq!(candidates[2], None);
-  }
-
-  #[test]
   fn test_map_plaintext_candidates_valid() {
-    let ciphers = vec![
-      vec![0x4c, 0xa0, 0x0f, 0xf4],
-      vec![0x5b, 0x1e, 0x39, 0x41],
-      vec![0x6a, 0xd3, 0xf3, 0xbc],
-    ];
     let pad = 0x00;
+    let key = Hex::from("f g h");
+    let plains = vec!["a b c", " d e ", "g h i", "efghy"];
+    let hexs: Vec<Hex> = plains.clone().into_iter().map(Hex::from).collect();
+
+    let ciphers: Vec<Vec<u8>> = hexs
+      .into_iter()
+      .map(|hex| Xor::xor_bytes(hex.bytes(), key.bytes(), pad))
+      .map(|cipher| cipher.bytes().to_vec())
+      .collect();
+
     let combinations = ManyTimePad::xor_all_combinations(&ciphers, pad);
-    let candidates = ManyTimePad::combined_candidates(&combinations);
-    println!("{candidates:#?}");
+    let candidates = ManyTimePad::candidates(&combinations, &ciphers);
+    let deductions = ManyTimePad::deduce_plaintexts(candidates);
+    let derived_plaintexts = ManyTimePad::get_plaintexts(deductions);
+
+    assert_eq!(plains, derived_plaintexts);
   }
 
   // #[test]
