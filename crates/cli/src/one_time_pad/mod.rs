@@ -105,7 +105,7 @@ impl OneTimePad {
       config.key.as_str().try_into().unwrap()
     };
 
-    let xor = Xor::xor_bytes_padded(&alpha.bytes, &beta.bytes, 0);
+    let xor = Xor::xor_bytes(&alpha.bytes, &beta.bytes, 0x00);
     let otp = Self::new(xor);
 
     write!(output, "{otp}")?;
@@ -158,7 +158,7 @@ impl OneTimePad {
       key.try_into().unwrap()
     };
 
-    let xor = Xor::xor_bytes_padded(&alpha.bytes, &beta.bytes, 0);
+    let xor = Xor::xor_bytes(&alpha.bytes, &beta.bytes, 0x00);
     let otp = Self::new(xor);
     let fmt = format!("{otp}");
 

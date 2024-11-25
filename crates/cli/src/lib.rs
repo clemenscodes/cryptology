@@ -158,7 +158,7 @@ pub enum Command {
     /// Treat alpha as raw hex string
     #[arg(
       short = 'r',
-      long = "raw",
+      long = "raw-alpha",
       value_name = "RAW ALPHA",
       help = "Treats the alpha as raw hex"
     )]
@@ -167,7 +167,7 @@ pub enum Command {
     /// Treat beta as raw hex string
     #[arg(
       short = 'y',
-      long = "raw",
+      long = "raw-beta",
       value_name = "RAW BETA",
       help = "Treats the beta as raw hex"
     )]

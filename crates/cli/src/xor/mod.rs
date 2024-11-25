@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Write, iter::repeat, path::PathBuf};
+use std::{fmt::Display, io::Write, path::PathBuf};
 
 use crate::{hex::Hex, Command};
 
@@ -65,39 +65,41 @@ impl Xor {
 
     let alpha = if config.raw_alpha {
       let alpha = String::from_utf8(alpha).unwrap();
-      Hex::parse_hex(&alpha).unwrap().bytes
+      let alpha = alpha.trim_end().to_string();
+      Hex::parse_hex(&alpha)
+        .expect("Failed to parse raw alpha")
+        .bytes
     } else {
-      let hex: Hex = alpha.try_into().unwrap();
+      let hex: Hex = alpha.try_into().expect("Failed to parse ascii alpha");
       hex.bytes
     };
 
     let beta = if config.raw_beta {
       let beta = String::from_utf8(beta).unwrap();
-      Hex::parse_hex(&beta).unwrap().bytes
+      let beta = beta.trim_end().to_string();
+      Hex::parse_hex(&beta)
+        .expect("Failed to parse raw beta")
+        .bytes
     } else {
-      let hex: Hex = beta.try_into().unwrap();
+      let hex: Hex = beta.try_into().expect("Failed to parse ascii beta");
       hex.bytes
     };
 
-    let xor = Self::xor_bytes_padded(&alpha, &beta, 0);
+    let xor = Self::xor_bytes(&alpha, &beta, 0);
 
     write!(output, "{xor}")
   }
 
-  pub fn xor_bytes(alpha: &[u8], beta: &[u8]) -> Self {
-    let bytes = alpha
-      .iter()
-      .zip(beta.iter())
-      .map(|(alpha, beta)| alpha ^ beta)
-      .collect();
-
-    Self::new(Hex::new(bytes))
-  }
-
-  pub fn xor_bytes_padded(alpha: &[u8], beta: &[u8], pad: u8) -> Self {
+  pub fn xor_bytes(alpha: &[u8], beta: &[u8], pad: u8) -> Self {
     let max_len = std::cmp::max(alpha.len(), beta.len());
-    let alpha_padded = alpha.iter().chain(repeat(&pad)).take(max_len);
-    let beta_padded = beta.iter().chain(repeat(&pad)).take(max_len);
+
+    let alpha_padded = std::iter::repeat(&pad)
+      .take(max_len - alpha.len())
+      .chain(alpha.iter());
+    let beta_padded = std::iter::repeat(&pad)
+      .take(max_len - beta.len())
+      .chain(beta.iter());
+
     let bytes = alpha_padded.zip(beta_padded).map(|(a, b)| a ^ b).collect();
 
     Self::new(Hex::new(bytes))
@@ -120,7 +122,7 @@ mod tests {
     let alpha = b"Hello";
     let beta = b"World";
 
-    let result = Xor::xor_bytes(alpha, beta);
+    let result = Xor::xor_bytes(alpha, beta, 0x00);
 
     let expected = vec![
       b'H' ^ b'W',
@@ -138,7 +140,7 @@ mod tests {
     let alpha = b"Hello";
     let beta = b"Hello";
 
-    let xor = Xor::xor_bytes(alpha, beta);
+    let xor = Xor::xor_bytes(alpha, beta, 0x00);
 
     let result = format!("{xor}");
     let expected = String::from("0000000000");
@@ -147,35 +149,75 @@ mod tests {
   }
 
   #[test]
-  fn test_xor_with_key_longer_than_plaintext() {
-    let plaintext = b"HELLO";
-    let key = b"SECRETKEY";
-
-    let expected = vec![27, 0, 15, 30, 10, 84, 75, 69, 89];
-    let result = Xor::xor_bytes_padded(plaintext, key, 0);
-
-    assert_eq!(result.hex.bytes, expected);
-  }
-
-  #[test]
-  fn test_xor_with_plaintext_longer_than_key() {
-    let plaintext = b"HELLOTHERE";
-    let key = b"KEY";
-
-    let expected = vec![3, 0, 21, 76, 79, 84, 72, 69, 82, 69];
-    let result = Xor::xor_bytes_padded(plaintext, key, 0);
-
-    assert_eq!(result.hex.bytes, expected);
-  }
-
-  #[test]
   fn test_xor_with_empty_inputs() {
     let alpha = b"";
     let beta = b"";
 
     let expected: Vec<u8> = vec![];
-    let result = Xor::xor_bytes(alpha, beta);
+    let result = Xor::xor_bytes(alpha, beta, 0x00);
 
+    assert_eq!(result.hex.bytes, expected);
+  }
+
+  #[test]
+  fn test_xor_bytes_padded_same_length() {
+    let alpha = vec![0b1100_1100, 0b1010_1010];
+    let beta = vec![0b0011_0011, 0b0101_0101];
+    let result = Xor::xor_bytes(&alpha, &beta, 0x00);
+    let expected = vec![0b1111_1111, 0b1111_1111];
+    assert_eq!(result.hex.bytes, expected);
+  }
+
+  #[test]
+  fn test_xor_bytes_padded_alpha_shorter() {
+    let alpha = vec![0b1100_1100];
+    let beta = vec![0b0011_0011, 0b0101_0101];
+    let result = Xor::xor_bytes(&alpha, &beta, 0x00);
+    let expected = vec![0b0011_0011, 0b1001_1001];
+    assert_eq!(result.hex.bytes, expected);
+  }
+
+  #[test]
+  fn test_xor_bytes_padded_beta_shorter() {
+    let alpha = vec![0b1100_1100, 0b1010_1010];
+    let beta = vec![0b0011_0011];
+    let result = Xor::xor_bytes(&alpha, &beta, 0x00);
+    let expected = vec![0b1100_1100, 0b1001_1001];
+    assert_eq!(result.hex.bytes, expected);
+  }
+
+  #[test]
+  fn test_xor_bytes_padded_with_non_zero_pad() {
+    let alpha = vec![0b1100_1100];
+    let beta = vec![0b0011_0011, 0b0101_0101];
+    let pad = 0b1111_1111;
+    let result = Xor::xor_bytes(&alpha, &beta, pad);
+    let expected = vec![0b1100_1100, 0b1001_1001];
+    assert_eq!(result.hex.bytes, expected);
+  }
+
+  #[test]
+  fn test_xor_bytes_padded_empty_alpha() {
+    let alpha: Vec<u8> = vec![];
+    let beta = vec![0b0011_0011, 0b0101_0101];
+    let result = Xor::xor_bytes(&alpha, &beta, 0x00);
+    assert_eq!(result.hex.bytes, beta);
+  }
+
+  #[test]
+  fn test_xor_bytes_padded_empty_beta() {
+    let alpha = vec![0b1100_1100, 0b1010_1010];
+    let beta: Vec<u8> = vec![];
+    let result = Xor::xor_bytes(&alpha, &beta, 0x00);
+    assert_eq!(result.hex.bytes, alpha);
+  }
+
+  #[test]
+  fn test_xor_bytes_padded_empty_both() {
+    let alpha: Vec<u8> = vec![];
+    let beta: Vec<u8> = vec![];
+    let result = Xor::xor_bytes(&alpha, &beta, 0x00);
+    let expected: Vec<u8> = vec![];
     assert_eq!(result.hex.bytes, expected);
   }
 }

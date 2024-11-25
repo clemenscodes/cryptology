@@ -5,21 +5,19 @@ pub struct ManyTimePad;
 
 impl ManyTimePad {
   pub fn encrypt<R: Read, W: Write>(
-    input: &mut R,
-    output: &mut W,
+    _input: &mut R,
+    _output: &mut W,
   ) -> std::io::Result<()> {
     Ok(())
   }
 
   pub fn decrypt<R: Read, W: Write>(
-    input: &mut R,
-    output: &mut W,
+    _input: &mut R,
+    _output: &mut W,
   ) -> std::io::Result<()> {
     Ok(())
   }
 }
 
 #[cfg(test)]
-mod tests {
-  use super::*;
-}
+mod tests {}

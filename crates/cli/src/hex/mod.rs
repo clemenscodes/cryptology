@@ -119,12 +119,22 @@ impl Hex {
     Ok(())
   }
 
-  pub fn is_valid_hex(s: &str) -> bool {
-    s.len() % 2 == 0 && s.chars().all(|c| c.is_ascii_hexdigit())
+  pub fn is_valid_hex(s: &str) -> Result<(), HexParseError> {
+    if s.len() % 2 != 0 {
+      dbg!(s);
+      dbg!(s.len());
+      return Err(HexParseError::InvalidLength);
+    }
+    if !(s.chars().all(|c| c.is_ascii_hexdigit())) {
+      return Err(HexParseError::InvalidHex);
+    }
+    Ok(())
   }
 
   pub fn parse_hex(value: &str) -> Result<Self, HexParseError> {
-    if Self::is_valid_hex(value) {
+    if let Err(err) = Self::is_valid_hex(value) {
+      Err(err)
+    } else {
       let mut bytes = Vec::new();
       for index in (0..value.len()).step_by(2) {
         let hex_pair = &value[index..index + 2];
@@ -133,8 +143,6 @@ impl Hex {
         bytes.push(byte);
       }
       Ok(Self::new(bytes))
-    } else {
-      Err(HexParseError::InvalidHex)
     }
   }
 
@@ -274,10 +282,16 @@ mod tests {
 
   #[test]
   fn test_is_valid_hex() {
-    assert!(Hex::is_valid_hex("deadbeef"));
-    assert!(Hex::is_valid_hex("DEADBEEF"));
-    assert!(!Hex::is_valid_hex("deadbee"));
-    assert!(!Hex::is_valid_hex("deadg123"));
+    assert!(Hex::is_valid_hex("deadbeef").is_ok());
+    assert!(Hex::is_valid_hex("DEADBEEF").is_ok());
+    assert_eq!(
+      Hex::is_valid_hex("deadbee").unwrap_err(),
+      HexParseError::InvalidLength
+    );
+    assert_eq!(
+      Hex::is_valid_hex("deadg123").unwrap_err(),
+      HexParseError::InvalidHex
+    );
   }
 
   #[test]
