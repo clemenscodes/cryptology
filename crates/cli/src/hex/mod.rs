@@ -159,6 +159,10 @@ impl Hex {
       })
       .collect()
   }
+
+  pub fn bytes(&self) -> &[u8] {
+    &self.bytes
+  }
 }
 
 impl TryFrom<Box<dyn Read>> for Hex {

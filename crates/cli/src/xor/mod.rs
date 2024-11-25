@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Write, path::PathBuf};
+use std::{collections::BTreeMap, fmt::Display, io::Write, path::PathBuf};
 
 use crate::{hex::Hex, Command};
 
@@ -71,7 +71,7 @@ impl Xor {
         .bytes
     } else {
       let hex: Hex = alpha.try_into().expect("Failed to parse ascii alpha");
-      hex.bytes
+      hex.bytes().to_vec()
     };
 
     let beta = if config.raw_beta {
@@ -82,7 +82,7 @@ impl Xor {
         .bytes
     } else {
       let hex: Hex = beta.try_into().expect("Failed to parse ascii beta");
-      hex.bytes
+      hex.bytes().to_vec()
     };
 
     let xor = Self::xor_bytes(&alpha, &beta, 0);
@@ -103,6 +103,30 @@ impl Xor {
     let bytes = alpha_padded.zip(beta_padded).map(|(a, b)| a ^ b).collect();
 
     Self::new(Hex::new(bytes))
+  }
+
+  pub fn xor_all_combinations(
+    ciphertexts: &[Vec<u8>],
+    pad: u8,
+  ) -> BTreeMap<(usize, usize), Self> {
+    let mut results = BTreeMap::new();
+
+    for (i, alpha) in ciphertexts.iter().enumerate() {
+      for (j, beta) in ciphertexts.iter().enumerate().skip(i + 1) {
+        let xor_result = Self::xor_bytes(alpha, beta, pad);
+        results.insert((i, j), xor_result);
+      }
+    }
+
+    results
+  }
+
+  pub fn bytes(&self) -> &[u8] {
+    self.hex.bytes()
+  }
+
+  pub fn to_ascii(&self) -> String {
+    self.hex.to_ascii()
   }
 }
 
@@ -132,7 +156,7 @@ mod tests {
       b'o' ^ b'd',
     ];
 
-    assert_eq!(result.hex.bytes, expected);
+    assert_eq!(result.bytes(), expected);
   }
 
   #[test]
@@ -156,7 +180,7 @@ mod tests {
     let expected: Vec<u8> = vec![];
     let result = Xor::xor_bytes(alpha, beta, 0x00);
 
-    assert_eq!(result.hex.bytes, expected);
+    assert_eq!(result.bytes(), expected);
   }
 
   #[test]
@@ -165,7 +189,7 @@ mod tests {
     let beta = vec![0b0011_0011, 0b0101_0101];
     let result = Xor::xor_bytes(&alpha, &beta, 0x00);
     let expected = vec![0b1111_1111, 0b1111_1111];
-    assert_eq!(result.hex.bytes, expected);
+    assert_eq!(result.bytes(), expected);
   }
 
   #[test]
@@ -174,7 +198,7 @@ mod tests {
     let beta = vec![0b0011_0011, 0b0101_0101];
     let result = Xor::xor_bytes(&alpha, &beta, 0x00);
     let expected = vec![0b0011_0011, 0b1001_1001];
-    assert_eq!(result.hex.bytes, expected);
+    assert_eq!(result.bytes(), expected);
   }
 
   #[test]
@@ -183,7 +207,7 @@ mod tests {
     let beta = vec![0b0011_0011];
     let result = Xor::xor_bytes(&alpha, &beta, 0x00);
     let expected = vec![0b1100_1100, 0b1001_1001];
-    assert_eq!(result.hex.bytes, expected);
+    assert_eq!(result.bytes(), expected);
   }
 
   #[test]
@@ -193,7 +217,7 @@ mod tests {
     let pad = 0b1111_1111;
     let result = Xor::xor_bytes(&alpha, &beta, pad);
     let expected = vec![0b1100_1100, 0b1001_1001];
-    assert_eq!(result.hex.bytes, expected);
+    assert_eq!(result.bytes(), expected);
   }
 
   #[test]
@@ -201,7 +225,7 @@ mod tests {
     let alpha: Vec<u8> = vec![];
     let beta = vec![0b0011_0011, 0b0101_0101];
     let result = Xor::xor_bytes(&alpha, &beta, 0x00);
-    assert_eq!(result.hex.bytes, beta);
+    assert_eq!(result.bytes(), beta);
   }
 
   #[test]
@@ -209,7 +233,7 @@ mod tests {
     let alpha = vec![0b1100_1100, 0b1010_1010];
     let beta: Vec<u8> = vec![];
     let result = Xor::xor_bytes(&alpha, &beta, 0x00);
-    assert_eq!(result.hex.bytes, alpha);
+    assert_eq!(result.bytes(), alpha);
   }
 
   #[test]
@@ -218,6 +242,44 @@ mod tests {
     let beta: Vec<u8> = vec![];
     let result = Xor::xor_bytes(&alpha, &beta, 0x00);
     let expected: Vec<u8> = vec![];
-    assert_eq!(result.hex.bytes, expected);
+    assert_eq!(result.bytes(), expected);
+  }
+
+  #[test]
+  fn test_xor_all_combinations_basic() {
+    let ciphertexts = vec![
+      vec![0x4c, 0xa0, 0x0f, 0xf4],
+      vec![0x5b, 0x1e, 0x39, 0x41],
+      vec![0x6a, 0xd3, 0xf3, 0xbc],
+    ];
+
+    let pad = 0x00;
+
+    let results = Xor::xor_all_combinations(&ciphertexts, pad);
+
+    let expected_1_2 = vec![0x17, 0xbe, 0x36, 0xb5];
+    let expected_1_3 = vec![0x26, 0x73, 0xfc, 0x48];
+    let expected_2_3 = vec![0x31, 0xcd, 0xca, 0xfd];
+
+    assert_eq!(results.get(&(0, 1)).unwrap().bytes(), expected_1_2);
+    assert_eq!(results.get(&(0, 2)).unwrap().bytes(), expected_1_3);
+    assert_eq!(results.get(&(1, 2)).unwrap().bytes(), expected_2_3);
+  }
+
+  #[test]
+  fn test_xor_all_combinations_with_padding() {
+    let ciphers = vec![vec![0x4c, 0xa0, 0x0f], vec![0x5b, 0x1e, 0x39, 0x41]];
+
+    let pad = 0x00;
+
+    let results = Xor::xor_all_combinations(&ciphers, pad);
+
+    // Adjust the shorter ciphertext to prepend the padding
+    // Cipher 1: [0x00, 0x4c, 0xa0, 0x0f]
+    // Cipher 2: [0x5b, 0x1e, 0x39, 0x41]
+    // XOR:      [0x5b, 0x52, 0x99, 0x4e]
+    let expected_1_2 = vec![0x5b, 0x52, 0x99, 0x4e];
+
+    assert_eq!(results.get(&(0, 1)).unwrap().bytes(), expected_1_2);
   }
 }
