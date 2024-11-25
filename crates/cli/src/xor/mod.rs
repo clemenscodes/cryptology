@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Display, io::Write, path::PathBuf};
+use std::{fmt::Display, io::Write, path::PathBuf};
 
 use crate::{hex::Hex, Command};
 
@@ -51,11 +51,20 @@ pub struct Xor {
   pub hex: Hex,
 }
 
-impl Xor {
-  pub fn new(hex: Hex) -> Self {
+impl From<Vec<u8>> for Xor {
+  fn from(value: Vec<u8>) -> Self {
+    let hex = value.into();
     Self { hex }
   }
+}
 
+impl From<Hex> for Xor {
+  fn from(value: Hex) -> Self {
+    Self { hex: value }
+  }
+}
+
+impl Xor {
   pub fn xor<W: Write>(
     config: XorConfig,
     output: &mut W,
@@ -70,8 +79,7 @@ impl Xor {
         .expect("Failed to parse raw alpha")
         .bytes
     } else {
-      let hex: Hex = alpha.try_into().expect("Failed to parse ascii alpha");
-      hex.bytes().to_vec()
+      alpha
     };
 
     let beta = if config.raw_beta {
@@ -81,8 +89,7 @@ impl Xor {
         .expect("Failed to parse raw beta")
         .bytes
     } else {
-      let hex: Hex = beta.try_into().expect("Failed to parse ascii beta");
-      hex.bytes().to_vec()
+      beta
     };
 
     let xor = Self::xor_bytes(&alpha, &beta, 0);
@@ -96,29 +103,17 @@ impl Xor {
     let alpha_padded = std::iter::repeat(&pad)
       .take(max_len - alpha.len())
       .chain(alpha.iter());
+
     let beta_padded = std::iter::repeat(&pad)
       .take(max_len - beta.len())
       .chain(beta.iter());
 
-    let bytes = alpha_padded.zip(beta_padded).map(|(a, b)| a ^ b).collect();
+    let bytes = alpha_padded
+      .zip(beta_padded)
+      .map(|(a, b)| a ^ b)
+      .collect::<Vec<u8>>();
 
-    Self::new(Hex::new(bytes))
-  }
-
-  pub fn xor_all_combinations(
-    ciphertexts: &[Vec<u8>],
-    pad: u8,
-  ) -> BTreeMap<(usize, usize), Self> {
-    let mut results = BTreeMap::new();
-
-    for (i, alpha) in ciphertexts.iter().enumerate() {
-      for (j, beta) in ciphertexts.iter().enumerate().skip(i + 1) {
-        let xor_result = Self::xor_bytes(alpha, beta, pad);
-        results.insert((i, j), xor_result);
-      }
-    }
-
-    results
+    bytes.into()
   }
 
   pub fn bytes(&self) -> &[u8] {
@@ -243,43 +238,5 @@ mod tests {
     let result = Xor::xor_bytes(&alpha, &beta, 0x00);
     let expected: Vec<u8> = vec![];
     assert_eq!(result.bytes(), expected);
-  }
-
-  #[test]
-  fn test_xor_all_combinations_basic() {
-    let ciphertexts = vec![
-      vec![0x4c, 0xa0, 0x0f, 0xf4],
-      vec![0x5b, 0x1e, 0x39, 0x41],
-      vec![0x6a, 0xd3, 0xf3, 0xbc],
-    ];
-
-    let pad = 0x00;
-
-    let results = Xor::xor_all_combinations(&ciphertexts, pad);
-
-    let expected_1_2 = vec![0x17, 0xbe, 0x36, 0xb5];
-    let expected_1_3 = vec![0x26, 0x73, 0xfc, 0x48];
-    let expected_2_3 = vec![0x31, 0xcd, 0xca, 0xfd];
-
-    assert_eq!(results.get(&(0, 1)).unwrap().bytes(), expected_1_2);
-    assert_eq!(results.get(&(0, 2)).unwrap().bytes(), expected_1_3);
-    assert_eq!(results.get(&(1, 2)).unwrap().bytes(), expected_2_3);
-  }
-
-  #[test]
-  fn test_xor_all_combinations_with_padding() {
-    let ciphers = vec![vec![0x4c, 0xa0, 0x0f], vec![0x5b, 0x1e, 0x39, 0x41]];
-
-    let pad = 0x00;
-
-    let results = Xor::xor_all_combinations(&ciphers, pad);
-
-    // Adjust the shorter ciphertext to prepend the padding
-    // Cipher 1: [0x00, 0x4c, 0xa0, 0x0f]
-    // Cipher 2: [0x5b, 0x1e, 0x39, 0x41]
-    // XOR:      [0x5b, 0x52, 0x99, 0x4e]
-    let expected_1_2 = vec![0x5b, 0x52, 0x99, 0x4e];
-
-    assert_eq!(results.get(&(0, 1)).unwrap().bytes(), expected_1_2);
   }
 }

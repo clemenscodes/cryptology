@@ -89,11 +89,13 @@ pub struct Hex {
   pub bytes: Vec<u8>,
 }
 
-impl Hex {
-  pub fn new(bytes: Vec<u8>) -> Self {
-    Self { bytes }
+impl From<Vec<u8>> for Hex {
+  fn from(value: Vec<u8>) -> Self {
+    Self { bytes: value }
   }
+}
 
+impl Hex {
   pub fn parse<R: Read, W: Write>(
     input: &mut R,
     output: &mut W,
@@ -106,7 +108,7 @@ impl Hex {
     let hex: Self = if config.raw {
       Self::parse_hex(&buf)?
     } else {
-      buf.try_into()?
+      buf.into()
     };
 
     if config.to_ascii {
@@ -142,7 +144,7 @@ impl Hex {
           .map_err(|_| HexParseError::InvalidHex)?;
         bytes.push(byte);
       }
-      Ok(Self::new(bytes))
+      Ok(bytes.into())
     }
   }
 
@@ -173,31 +175,19 @@ impl TryFrom<Box<dyn Read>> for Hex {
     value
       .read_to_end(&mut buffer)
       .map_err(|_| HexParseError::FileReadError)?;
-    Ok(Self::new(buffer))
+    Ok(buffer.into())
   }
 }
 
-impl TryFrom<&str> for Hex {
-  type Error = HexParseError;
-
-  fn try_from(value: &str) -> Result<Self, Self::Error> {
-    Ok(Self::new(value.as_bytes().to_vec()))
+impl From<&str> for Hex {
+  fn from(value: &str) -> Self {
+    value.as_bytes().into()
   }
 }
 
-impl TryFrom<Vec<u8>> for Hex {
-  type Error = ();
-
-  fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-    Ok(Self::new(value))
-  }
-}
-
-impl TryFrom<&[u8]> for Hex {
-  type Error = ();
-
-  fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-    Ok(Self::new(value.to_vec()))
+impl From<&[u8]> for Hex {
+  fn from(value: &[u8]) -> Self {
+    value.to_vec().into()
   }
 }
 
@@ -206,15 +196,13 @@ impl TryFrom<PathBuf> for Hex {
 
   fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
     let bytes = fs::read(path).map_err(|_| HexParseError::FileReadError)?;
-    Ok(Self::new(bytes))
+    Ok(bytes.into())
   }
 }
 
-impl TryFrom<String> for Hex {
-  type Error = HexParseError;
-
-  fn try_from(value: String) -> Result<Self, Self::Error> {
-    Self::try_from(value.as_str())
+impl From<String> for Hex {
+  fn from(value: String) -> Self {
+    value.as_str().into()
   }
 }
 
@@ -223,7 +211,7 @@ impl TryFrom<&PathBuf> for Hex {
 
   fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
     let bytes = fs::read(path).map_err(|_| HexParseError::FileReadError)?;
-    Ok(Self::new(bytes))
+    Ok(bytes.into())
   }
 }
 
@@ -257,7 +245,7 @@ mod tests {
   #[test]
   fn test_regular_string_to_hex() {
     let input = "World";
-    let hex: Hex = input.try_into().unwrap();
+    let hex: Hex = input.into();
     assert_eq!(hex.bytes, b"World".to_vec());
     assert_eq!(format!("{hex}"), "576f726c64");
   }
@@ -265,14 +253,14 @@ mod tests {
   #[test]
   fn test_from_vec_u8() {
     let bytes = vec![0x01, 0x02, 0x03, 0x04];
-    let hex: Hex = Hex::try_from(bytes.clone()).unwrap();
+    let hex: Hex = Hex::from(bytes.clone());
     assert_eq!(hex.bytes, bytes);
   }
 
   #[test]
   fn test_from_u8_slice() {
     let bytes = vec![0x01, 0x02, 0x03, 0x04];
-    let hex: Hex = Hex::try_from(bytes.as_slice()).unwrap();
+    let hex: Hex = Hex::from(bytes.as_slice());
     assert_eq!(hex.bytes, bytes.to_vec());
   }
 
@@ -300,23 +288,23 @@ mod tests {
 
   #[test]
   fn test_to_ascii() {
-    let hex = Hex::new(vec![
+    let hex = Hex::from(vec![
       72, 101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 33,
     ]);
     assert_eq!(hex.to_ascii(), "Hello, World!");
 
-    let hex = Hex::new(vec![
+    let hex = Hex::from(vec![
       72, 101, 108, 108, 111, 0xFF, 44, 32, 87, 111, 114, 108, 100, 33,
     ]);
     assert_eq!(hex.to_ascii(), "Hello., World!");
 
-    let hex = Hex::new(vec![]);
+    let hex = Hex::from(vec![]);
     assert_eq!(hex.to_ascii(), "");
 
-    let hex = Hex::new(vec![0x80, 0xFF, 0xAB]);
+    let hex = Hex::from(vec![0x80, 0xFF, 0xAB]);
     assert_eq!(hex.to_ascii(), "...");
 
-    let hex = Hex::new(vec![9, 10, 32, 65, 66, 67]);
+    let hex = Hex::from(vec![9, 10, 32, 65, 66, 67]);
     assert_eq!(hex.to_ascii(), "\t\n ABC");
   }
 }

@@ -96,13 +96,13 @@ impl OneTimePad {
     let alpha = if config.raw_input {
       Hex::parse_hex(&plaintext).unwrap()
     } else {
-      plaintext.try_into().unwrap()
+      plaintext.into()
     };
 
     let beta = if config.raw_key {
       Hex::parse_hex(&config.key).unwrap()
     } else {
-      config.key.as_str().try_into().unwrap()
+      config.key.as_str().into()
     };
 
     let xor = Xor::xor_bytes(&alpha.bytes, &beta.bytes, 0x00);
@@ -149,13 +149,13 @@ impl OneTimePad {
     let alpha = if config.raw_input {
       Hex::parse_hex(line).unwrap()
     } else {
-      line.try_into().unwrap()
+      line.into()
     };
 
     let beta = if config.raw_key {
       Hex::parse_hex(key.as_str()).unwrap()
     } else {
-      key.try_into().unwrap()
+      key.into()
     };
 
     let xor = Xor::xor_bytes(&alpha.bytes, &beta.bytes, 0x00);
