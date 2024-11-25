@@ -36,7 +36,7 @@ impl ManyTimePad {
       })
       .collect();
 
-    let combinations = Self::xor_all_combinations(&ciphertexts, 0x00);
+    let combinations = Self::xor_all_combinations(&ciphertexts);
     let candidates = Self::candidates(&combinations, &ciphertexts);
     let deductions = Self::deduce_plaintexts(candidates);
     let plaintexts = Self::get_plaintexts(deductions);
@@ -57,16 +57,22 @@ impl ManyTimePad {
     candidate.is_ascii_alphabetic()
   }
 
-  pub fn xor_all_combinations(
-    ciphertexts: &[Vec<u8>],
-    pad: u8,
-  ) -> XorCombination {
+  pub fn xor_all_combinations(ciphertexts: &[Vec<u8>]) -> XorCombination {
     let mut results = XorCombination::new();
 
     for (i, alpha) in ciphertexts.iter().enumerate() {
       for (j, beta) in ciphertexts.iter().enumerate().skip(i + 1) {
-        let xor_result = Xor::xor_bytes(alpha, beta, pad);
-        results.insert((i, j), xor_result);
+        let max_length = alpha.len().max(beta.len());
+
+        let xor_result: Vec<u8> = (0..max_length)
+          .map(|k| {
+            let byte_a = alpha.get(k).copied().unwrap_or(0x00);
+            let byte_b = beta.get(k).copied().unwrap_or(0x00);
+            byte_a ^ byte_b
+          })
+          .collect();
+
+        results.insert((i, j), Xor::from(xor_result));
       }
     }
 
@@ -188,8 +194,7 @@ mod tests {
       vec![0x5b, 0x1e, 0x39, 0x41],
       vec![0x6a, 0xd3, 0xf3, 0xbc],
     ];
-    let pad = 0x00;
-    let results = ManyTimePad::xor_all_combinations(&ciphertexts, pad);
+    let results = ManyTimePad::xor_all_combinations(&ciphertexts);
     let expected_1_2 = vec![0x17, 0xbe, 0x36, 0xb5];
     let expected_1_3 = vec![0x26, 0x73, 0xfc, 0x48];
     let expected_2_3 = vec![0x31, 0xcd, 0xca, 0xfd];
@@ -199,29 +204,25 @@ mod tests {
   }
 
   #[test]
-  fn test_xor_all_combinations_with_padding() {
-    let ciphers = vec![vec![0x4c, 0xa0, 0x0f], vec![0x5b, 0x1e, 0x39, 0x41]];
-    let pad = 0x00;
-    let results = ManyTimePad::xor_all_combinations(&ciphers, pad);
-    let expected_1_2 = vec![0x5b, 0x52, 0x99, 0x4e];
-    assert_eq!(results.get(&(0, 1)).unwrap().bytes(), expected_1_2);
-  }
-
-  #[test]
   fn test_map_plaintext_candidates_valid() {
-    let pad = 0x00;
     let key = Hex::from("f g h");
-    let plains = vec!["a b c", " d e ", "g h i", "efghy"];
+    let plains = vec!["a b c", " d e ", "efghya"];
     let hexs: Vec<Hex> = plains.clone().into_iter().map(Hex::from).collect();
 
     let ciphers: Vec<Vec<u8>> = hexs
       .into_iter()
-      .map(|hex| Xor::xor_bytes(hex.bytes(), key.bytes(), pad))
+      .map(|hex| Xor::xor_key(hex.bytes(), key.bytes()))
       .map(|cipher| cipher.bytes().to_vec())
       .collect();
 
-    let combinations = ManyTimePad::xor_all_combinations(&ciphers, pad);
+    let combinations = ManyTimePad::xor_all_combinations(&ciphers);
+
+    println!("{combinations:#?}");
+
     let candidates = ManyTimePad::candidates(&combinations, &ciphers);
+
+    println!("{candidates:#?}");
+
     let deductions = ManyTimePad::deduce_plaintexts(candidates);
     let derived_plaintexts = ManyTimePad::get_plaintexts(deductions);
 

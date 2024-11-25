@@ -117,6 +117,17 @@ impl Xor {
     bytes.into()
   }
 
+  pub fn xor_key(data: &[u8], key: &[u8]) -> Self {
+    let repeated_key = key.iter().cycle();
+    let xor_result: Vec<u8> = data
+      .iter()
+      .zip(repeated_key)
+      .map(|(&byte, &key_byte)| byte ^ key_byte)
+      .collect();
+
+    xor_result.into()
+  }
+
   pub fn bytes(&self) -> &[u8] {
     self.hex.bytes()
   }
