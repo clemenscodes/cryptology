@@ -95,6 +95,63 @@ impl From<Vec<u8>> for Hex {
   }
 }
 
+impl From<&[u8]> for Hex {
+  fn from(value: &[u8]) -> Self {
+    value.to_vec().into()
+  }
+}
+
+impl From<&str> for Hex {
+  fn from(value: &str) -> Self {
+    value.as_bytes().into()
+  }
+}
+
+impl From<String> for Hex {
+  fn from(value: String) -> Self {
+    value.as_str().into()
+  }
+}
+
+impl TryFrom<Box<dyn Read>> for Hex {
+  type Error = HexParseError;
+
+  fn try_from(mut value: Box<dyn Read>) -> Result<Self, Self::Error> {
+    let mut buffer = Vec::new();
+    value
+      .read_to_end(&mut buffer)
+      .map_err(|_| HexParseError::FileReadError)?;
+    Ok(buffer.into())
+  }
+}
+
+impl TryFrom<PathBuf> for Hex {
+  type Error = HexParseError;
+
+  fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+    let bytes = fs::read(path).map_err(|_| HexParseError::FileReadError)?;
+    Ok(bytes.into())
+  }
+}
+
+impl TryFrom<&PathBuf> for Hex {
+  type Error = HexParseError;
+
+  fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
+    let bytes = fs::read(path).map_err(|_| HexParseError::FileReadError)?;
+    Ok(bytes.into())
+  }
+}
+
+impl std::fmt::Display for Hex {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    for byte in &self.bytes {
+      write!(f, "{:02x}", byte)?;
+    }
+    Ok(())
+  }
+}
+
 impl Hex {
   pub fn parse<R: Read, W: Write>(
     input: &mut R,
@@ -123,8 +180,6 @@ impl Hex {
 
   pub fn is_valid_hex(s: &str) -> Result<(), HexParseError> {
     if s.len() % 2 != 0 {
-      dbg!(s);
-      dbg!(s.len());
       return Err(HexParseError::InvalidLength);
     }
     if !(s.chars().all(|c| c.is_ascii_hexdigit())) {
@@ -164,63 +219,6 @@ impl Hex {
 
   pub fn bytes(&self) -> &[u8] {
     &self.bytes
-  }
-}
-
-impl TryFrom<Box<dyn Read>> for Hex {
-  type Error = HexParseError;
-
-  fn try_from(mut value: Box<dyn Read>) -> Result<Self, Self::Error> {
-    let mut buffer = Vec::new();
-    value
-      .read_to_end(&mut buffer)
-      .map_err(|_| HexParseError::FileReadError)?;
-    Ok(buffer.into())
-  }
-}
-
-impl From<&str> for Hex {
-  fn from(value: &str) -> Self {
-    value.as_bytes().into()
-  }
-}
-
-impl From<&[u8]> for Hex {
-  fn from(value: &[u8]) -> Self {
-    value.to_vec().into()
-  }
-}
-
-impl TryFrom<PathBuf> for Hex {
-  type Error = HexParseError;
-
-  fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-    let bytes = fs::read(path).map_err(|_| HexParseError::FileReadError)?;
-    Ok(bytes.into())
-  }
-}
-
-impl From<String> for Hex {
-  fn from(value: String) -> Self {
-    value.as_str().into()
-  }
-}
-
-impl TryFrom<&PathBuf> for Hex {
-  type Error = HexParseError;
-
-  fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
-    let bytes = fs::read(path).map_err(|_| HexParseError::FileReadError)?;
-    Ok(bytes.into())
-  }
-}
-
-impl std::fmt::Display for Hex {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    for byte in &self.bytes {
-      write!(f, "{:02x}", byte)?;
-    }
-    Ok(())
   }
 }
 

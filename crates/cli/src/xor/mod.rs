@@ -1,4 +1,10 @@
-use std::{fmt::Display, io::Write, path::PathBuf};
+use std::{
+  fmt::Display,
+  io::Write,
+  iter::{Chain, Copied, Repeat, Take},
+  path::PathBuf,
+  slice::Iter,
+};
 
 use crate::{hex::Hex, Command};
 
@@ -58,9 +64,34 @@ impl From<Vec<u8>> for Xor {
   }
 }
 
+impl From<&[u8]> for Xor {
+  fn from(value: &[u8]) -> Self {
+    value.to_vec().into()
+  }
+}
+
+impl From<&str> for Xor {
+  fn from(value: &str) -> Self {
+    value.as_bytes().into()
+  }
+}
+
+impl From<String> for Xor {
+  fn from(value: String) -> Self {
+    value.as_str().into()
+  }
+}
+
 impl From<Hex> for Xor {
   fn from(value: Hex) -> Self {
     Self { hex: value }
+  }
+}
+
+impl Display for Xor {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let hex = &self.hex;
+    write!(f, "{hex}")
   }
 }
 
@@ -71,27 +102,8 @@ impl Xor {
   ) -> std::io::Result<()> {
     let alpha = std::fs::read(config.alpha)?;
     let beta = std::fs::read(config.beta)?;
-
-    let alpha = if config.raw_alpha {
-      let alpha = String::from_utf8(alpha).unwrap();
-      let alpha = alpha.trim_end().to_string();
-      Hex::parse_hex(&alpha)
-        .expect("Failed to parse raw alpha")
-        .bytes
-    } else {
-      alpha
-    };
-
-    let beta = if config.raw_beta {
-      let beta = String::from_utf8(beta).unwrap();
-      let beta = beta.trim_end().to_string();
-      Hex::parse_hex(&beta)
-        .expect("Failed to parse raw beta")
-        .bytes
-    } else {
-      beta
-    };
-
+    let alpha = Self::prepare_input(alpha, config.raw_alpha)?;
+    let beta = Self::prepare_input(beta, config.raw_beta)?;
     let xor = Self::xor_bytes(&alpha, &beta, 0);
 
     write!(output, "{xor}")
@@ -99,20 +111,9 @@ impl Xor {
 
   pub fn xor_bytes(alpha: &[u8], beta: &[u8], pad: u8) -> Self {
     let max_len = std::cmp::max(alpha.len(), beta.len());
-
-    let alpha_padded = std::iter::repeat(&pad)
-      .take(max_len - alpha.len())
-      .chain(alpha.iter());
-
-    let beta_padded = std::iter::repeat(&pad)
-      .take(max_len - beta.len())
-      .chain(beta.iter());
-
-    let bytes = alpha_padded
-      .zip(beta_padded)
-      .map(|(a, b)| a ^ b)
-      .collect::<Vec<u8>>();
-
+    let alpha = Self::pad_slice(alpha, max_len, pad);
+    let beta = Self::pad_slice(beta, max_len, pad);
+    let bytes = alpha.zip(beta).map(|(a, b)| a ^ b).collect::<Vec<u8>>();
     bytes.into()
   }
 
@@ -123,12 +124,32 @@ impl Xor {
   pub fn to_ascii(&self) -> String {
     self.hex.to_ascii()
   }
-}
 
-impl Display for Xor {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let hex = &self.hex;
-    write!(f, "{hex}")
+  fn prepare_input(input: Vec<u8>, is_raw: bool) -> std::io::Result<Vec<u8>> {
+    if is_raw {
+      let input_str = String::from_utf8(input)
+        .expect("Input is not valid UTF-8")
+        .trim_end()
+        .to_string();
+
+      let bytes = Hex::parse_hex(&input_str)
+        .expect("Failed to parse raw hex")
+        .bytes;
+
+      Ok(bytes)
+    } else {
+      Ok(input)
+    }
+  }
+
+  fn pad_slice(
+    slice: &[u8],
+    max_len: usize,
+    pad: u8,
+  ) -> Chain<Take<Repeat<u8>>, Copied<Iter<'_, u8>>> {
+    std::iter::repeat(pad)
+      .take(max_len - slice.len())
+      .chain(slice.iter().copied())
   }
 }
 
