@@ -4,7 +4,7 @@ CONTAINER="cryptology"
 CLI_NAME="$CONTAINER"
 
 if [ -z "$1" ]; then
-  CLI_ARGS="decrypt vigenere --input ciphertext.txt --output solution.txt"
+  CLI_ARGS="decrypt many-time-pad -i ciphertext.txt -o solution.txt"
 else
   CLI_ARGS="$@"
 fi

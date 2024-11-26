@@ -17,3 +17,4 @@ cryptology = { path = "./crates/cryptology" }
 cli = { path = "./crates/cli" }
 clap = { version = "4.5.20", features = ["derive", "help"] }
 rayon = "1.10.0"
+rand = "0.8.5"

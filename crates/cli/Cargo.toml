@@ -9,4 +9,5 @@ authors.workspace = true
 [dependencies]
 clap.workspace = true
 rayon.workspace = true
+rand.workspace = true
 workspace = { version = "0.1", path = "../workspace" }

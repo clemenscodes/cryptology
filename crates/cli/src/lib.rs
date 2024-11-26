@@ -1,5 +1,6 @@
 pub mod caesar;
 pub mod frequency_analysis;
+pub mod hash_collisions;
 pub mod hex;
 pub mod many_time_pad;
 pub mod monoalphabetic_substitution;
@@ -8,6 +9,7 @@ pub mod vigenere;
 pub mod xor;
 
 use clap::{Parser, Subcommand};
+use hash_collisions::HashCollision;
 use hex::Hex;
 use many_time_pad::ManyTimePad;
 use xor::Xor;
@@ -203,6 +205,19 @@ pub enum Command {
   },
 
   /// Encrypt text using a specified cipher.
+  #[command(name = "hash-collision")]
+  HashCollision {
+    /// Print result as ASCII
+    #[arg(
+      short = 'r',
+      long = "rounds",
+      value_name = "ROUNDS",
+      help = "How many rounds to perform"
+    )]
+    rounds: u32,
+  },
+
+  /// Encrypt text using a specified cipher.
   #[command(name = "encrypt", visible_aliases = ["enc", "e"])]
   Encrypt {
     #[command(subcommand)]
@@ -364,6 +379,10 @@ impl Command {
         let (mut input, mut output) = Command::get_files(default_args);
         let config = self.into();
         Hex::parse(&mut input, &mut output, config)?;
+        Ok(())
+      }
+      Command::HashCollision { rounds } => {
+        HashCollision::exec(*rounds);
         Ok(())
       }
     }
