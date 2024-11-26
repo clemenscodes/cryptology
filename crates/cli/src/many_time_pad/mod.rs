@@ -38,10 +38,11 @@ impl ManyTimePad {
     let candidates = Self::candidates(&combinations, &ciphertexts);
     let deductions = Self::deduce_plaintexts(candidates);
     let plaintexts = Self::get_plaintexts(&deductions);
+    let key = Self::recover_key(&ciphertexts, &plaintexts);
+    let plaintexts = Self::derive_plaintexts(&ciphertexts, &key.into());
+    let message = plaintexts.last().unwrap();
 
-    for plaintext in plaintexts {
-      writeln!(output, "{plaintext}")?;
-    }
+    writeln!(output, "{message}")?;
 
     Ok(())
   }
@@ -59,20 +60,8 @@ impl ManyTimePad {
     let mut results = XorCombination::new();
 
     for (i, alpha) in ciphertexts.iter().enumerate() {
-      let alpha = alpha.bytes();
       for (j, beta) in ciphertexts.iter().enumerate().skip(i + 1) {
-        let beta = beta.bytes();
-        let max_length = alpha.len().max(beta.len());
-
-        let xor_result: Vec<u8> = (0..max_length)
-          .map(|k| {
-            let byte_a = alpha.get(k).copied().unwrap_or(0x00);
-            let byte_b = beta.get(k).copied().unwrap_or(0x00);
-            byte_a ^ byte_b
-          })
-          .collect();
-
-        results.insert((i, j), Xor::from(xor_result));
+        results.insert((i, j), Xor::xor_key(alpha.bytes(), beta.bytes()));
       }
     }
 
@@ -86,12 +75,10 @@ impl ManyTimePad {
     let mut candidates: PlaintextCandidates = PlaintextCandidates::new();
 
     for (&(alpha_index, beta_index), xor) in combinations {
-      let xor_bytes = xor.bytes();
-
       let c1_len = ciphertexts[alpha_index].bytes().len();
       let c2_len = ciphertexts[beta_index].bytes().len();
 
-      for (pos, &byte) in xor_bytes.iter().enumerate() {
+      for (pos, &byte) in xor.bytes().iter().enumerate() {
         if !Self::is_space_candidate(byte) {
           continue;
         }
@@ -144,10 +131,23 @@ impl ManyTimePad {
     candidates
       .into_iter()
       .filter_map(|((ciphertext_index, pos), char_counts)| {
-        char_counts
-          .into_iter()
-          .max_by_key(|&(_, count)| count)
-          .map(|(byte, _)| ((ciphertext_index, pos), byte))
+        let mut sorted_counts: Vec<_> = char_counts.into_iter().collect();
+        sorted_counts.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
+
+        if let Some((best_byte, best_count)) = sorted_counts.first() {
+          let next_count =
+            sorted_counts.get(1).map(|&(_, count)| count).unwrap_or(0);
+          if *best_byte == SPACE {
+            if (*best_count as f64) >= 1.7 * (next_count as f64) {
+              return Some(((ciphertext_index, pos), *best_byte));
+            } else if let Some((next_byte, _)) = sorted_counts.get(1) {
+              return Some(((ciphertext_index, pos), *next_byte));
+            }
+          } else {
+            return Some(((ciphertext_index, pos), *best_byte));
+          }
+        }
+        None
       })
       .collect()
   }
@@ -173,11 +173,73 @@ impl ManyTimePad {
       .collect()
   }
 
+  pub fn recover_key(ciphertexts: &[Hex], plaintexts: &[String]) -> Vec<u8> {
+    let max_length = ciphertexts
+      .iter()
+      .map(|ct| ct.bytes().len())
+      .min()
+      .unwrap_or(0);
+
+    let mut key: Vec<Option<u8>> = vec![None; max_length];
+
+    for i in 0..max_length {
+      let mut possible_key_bytes = std::collections::BTreeMap::new();
+
+      for (ciphertext, plaintext) in ciphertexts.iter().zip(plaintexts.iter()) {
+        if i < ciphertext.bytes().len() && i < plaintext.len() {
+          let ct_byte = ciphertext.bytes()[i];
+          let pt_byte = plaintext.as_bytes()[i];
+
+          if pt_byte != b' ' {
+            let key_byte = ct_byte ^ pt_byte;
+            *possible_key_bytes.entry(key_byte).or_insert(0) += 1;
+          }
+        }
+      }
+
+      if let Some((&key_byte, _)) =
+        possible_key_bytes.iter().max_by_key(|&(_, count)| count)
+      {
+        key[i] = Some(key_byte);
+      } else {
+        key[i] = Some(0x00);
+      }
+    }
+
+    key.into_iter().map(|byte| byte.unwrap_or(0x00)).collect()
+  }
+
   pub fn derive_plaintexts(ciphers: &[Hex], key: &Hex) -> Vec<String> {
     ciphers
       .iter()
       .map(|cipher| Xor::xor_key(cipher.bytes(), key.bytes()).hex.to_ascii())
       .collect()
+  }
+
+  pub fn test_key<R: Read, W: Write>(
+    input: &mut R,
+    output: &mut W,
+  ) -> std::io::Result<()> {
+    let mut buf = String::new();
+
+    input.read_to_string(&mut buf)?;
+
+    let ciphertexts: Vec<Hex> = buf
+      .lines()
+      .map(|line| {
+        Hex::parse_hex(line).expect("Failed to parse line {line} as hex")
+      })
+      .collect();
+
+    let combinations = Self::xor_all_combinations(&ciphertexts);
+    let candidates = Self::candidates(&combinations, &ciphertexts);
+    let deductions = Self::deduce_plaintexts(candidates);
+    let plaintexts = Self::get_plaintexts(&deductions);
+    let key: Hex = Self::recover_key(&ciphertexts, &plaintexts).into();
+
+    write!(output, "{key}")?;
+
+    Ok(())
   }
 }
 
@@ -234,6 +296,37 @@ mod tests {
   }
 
   #[test]
+  fn test_recover_key() -> std::io::Result<()> {
+    let assets = "src/many_time_pad/assets";
+    let path = std::env::var("CARGO_MANIFEST_DIR")
+      .map(|dir| std::path::PathBuf::from(dir).join(assets))
+      .unwrap_or_else(|_| {
+        std::env::current_dir()
+          .expect("Failed to get current directory")
+          .join("crates/cli")
+          .join(assets)
+      });
+
+    let input_path = path.join("ciphertext.txt");
+    let output_path = path.join("key.txt");
+
+    let mut input_file = std::fs::File::open(&input_path)?;
+    let mut output_file = std::fs::File::open(&output_path)?;
+    let mut output_buffer = Vec::new();
+
+    ManyTimePad::test_key(&mut input_file, &mut output_buffer)?;
+
+    let result = String::from_utf8(output_buffer).unwrap();
+    let mut expected = String::new();
+
+    output_file.read_to_string(&mut expected)?;
+
+    assert_eq!(result, expected.trim_end().to_string());
+
+    Ok(())
+  }
+
+  #[test]
   fn test_mtp_decrypt() -> std::io::Result<()> {
     let assets = "src/many_time_pad/assets";
     let path = std::env::var("CARGO_MANIFEST_DIR")
@@ -259,7 +352,7 @@ mod tests {
 
     output_file.read_to_string(&mut expected)?;
 
-    assert_eq!(result, expected);
+    assert_eq!(result, expected.trim_end().to_string());
 
     Ok(())
   }
