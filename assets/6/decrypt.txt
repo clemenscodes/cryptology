@@ -1,0 +1,13 @@
+We can factor the num er    w     ua tum  omputers  W  can also factor the number     ith   d g  rained u  b      r e  im s   R  e t Ha dey
+As Euler would pr bab y enj y      n w his theore  be omes a corner stone of crypto   Anno  m u  on Eules         m
+ The nice thin  a out Kee   q i    w w  c yptograp ers can drive a lot of fancy ca     Dan  o e 
+Th  ciphertext pr duced b  a w  k  n r pt on algor th  looks as good as ciphertext    duce  b    strong d cr        lg ri hm    hi i  Z emer anD
+You don t want  t  bu  a          r  e s  rom a g   w o specializes in stealing ca     Mar  R t  berg col  n  n   n Cli p r
+Th re are two typ s of cr   o r ph     ha  which w ll keep secrets safe from your li  le s st r  and thau  h  h   l  k  p se re s  a e  zom  ouX   vB D rnk  b    ey  r 
+Th  two type o  c ptograp     n    a   llows the   vernment to use brute force to     k th  c d   and ond  h      u re  t e   v  n e t  g us  bXu   A X r ko b    ey  rn
+We can see the po nt  her   h    i   s unhappy if   wrong bit is sent and consumes   re pow r f  m the eo  r  m      A i Sham r
+A  private key  e cry tion  ch m   t t s   algori  ms  namely a procedure for gene    ng k  s    procedus  f      r pting  a     p oced ze f r Ne  yW C pwk
+Th  Concise Ox or Dic ion            e in s crypt  as the art of  writing o r solv n  codes  
+Al  in all there  s s all   i      s y  A filler   n  elp to solve the riddle a bi    tter  h n withouth
+An  not to for et  the solu i n n  ds  no her sen  nc  such that one last tiny c h   r a c       can alsn be      p ed  u cessf  l   
+Th  secret mes ag  is  Wh n usin    stream cipher  ne er use the key more than onc 

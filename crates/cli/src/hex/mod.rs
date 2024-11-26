@@ -5,7 +5,7 @@ use std::{
   path::PathBuf,
 };
 
-use crate::Command;
+use crate::{xor::Xor, Command};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum HexParseError {
@@ -87,6 +87,12 @@ impl From<&Command> for HexConfig {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Hex {
   pub bytes: Vec<u8>,
+}
+
+impl From<Xor> for Hex {
+  fn from(value: Xor) -> Self {
+    value.hex
+  }
 }
 
 impl From<Vec<u8>> for Hex {

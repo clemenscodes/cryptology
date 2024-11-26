@@ -27,19 +27,17 @@ impl ManyTimePad {
 
     input.read_to_string(&mut buf)?;
 
-    let ciphertexts: Vec<Vec<u8>> = buf
+    let ciphertexts: Vec<Hex> = buf
       .lines()
       .map(|line| {
-        let message = format!("Failed to parse line {line} as hex");
-        let hex = Hex::parse_hex(line).expect(&message);
-        hex.bytes().to_vec()
+        Hex::parse_hex(line).expect("Failed to parse line {line} as hex")
       })
       .collect();
 
     let combinations = Self::xor_all_combinations(&ciphertexts);
     let candidates = Self::candidates(&combinations, &ciphertexts);
     let deductions = Self::deduce_plaintexts(candidates);
-    let plaintexts = Self::get_plaintexts(deductions);
+    let plaintexts = Self::get_plaintexts(&deductions);
 
     for plaintext in plaintexts {
       writeln!(output, "{plaintext}")?;
@@ -57,11 +55,13 @@ impl ManyTimePad {
     candidate.is_ascii_alphabetic()
   }
 
-  pub fn xor_all_combinations(ciphertexts: &[Vec<u8>]) -> XorCombination {
+  pub fn xor_all_combinations(ciphertexts: &[Hex]) -> XorCombination {
     let mut results = XorCombination::new();
 
     for (i, alpha) in ciphertexts.iter().enumerate() {
+      let alpha = alpha.bytes();
       for (j, beta) in ciphertexts.iter().enumerate().skip(i + 1) {
+        let beta = beta.bytes();
         let max_length = alpha.len().max(beta.len());
 
         let xor_result: Vec<u8> = (0..max_length)
@@ -81,18 +81,17 @@ impl ManyTimePad {
 
   pub fn candidates(
     combinations: &XorCombination,
-    ciphertexts: &[Vec<u8>],
+    ciphertexts: &[Hex],
   ) -> PlaintextCandidates {
-    let mut candidates: PlaintextCandidates = BTreeMap::new();
+    let mut candidates: PlaintextCandidates = PlaintextCandidates::new();
 
-    for (&(i, j), xor) in combinations {
+    for (&(alpha_index, beta_index), xor) in combinations {
       let xor_bytes = xor.bytes();
 
-      for (pos, &byte) in xor_bytes.iter().enumerate() {
-        if pos >= ciphertexts[i].len() || pos >= ciphertexts[j].len() {
-          continue;
-        }
+      let c1_len = ciphertexts[alpha_index].bytes().len();
+      let c2_len = ciphertexts[beta_index].bytes().len();
 
+      for (pos, &byte) in xor_bytes.iter().enumerate() {
         if !Self::is_space_candidate(byte) {
           continue;
         }
@@ -100,38 +99,43 @@ impl ManyTimePad {
         let p2 = Self::get_candidate(byte);
 
         if p2.is_ascii_graphic() || p2 == SPACE {
-          *candidates
-            .entry((i, pos))
-            .or_default()
-            .entry(SPACE)
-            .or_insert(0) += 1;
+          if pos < c1_len {
+            Self::update_candidates(&mut candidates, alpha_index, pos, SPACE);
+          }
 
-          *candidates
-            .entry((j, pos))
-            .or_default()
-            .entry(p2)
-            .or_insert(0) += 1;
+          if pos < c2_len {
+            Self::update_candidates(&mut candidates, beta_index, pos, p2);
+          }
         }
 
         let p1 = Self::get_candidate(byte);
 
         if p1.is_ascii_graphic() || p1 == SPACE {
-          *candidates
-            .entry((i, pos))
-            .or_default()
-            .entry(p1)
-            .or_insert(0) += 1;
+          if pos < c1_len {
+            Self::update_candidates(&mut candidates, alpha_index, pos, p1);
+          }
 
-          *candidates
-            .entry((j, pos))
-            .or_default()
-            .entry(SPACE)
-            .or_insert(0) += 1;
+          if pos < c2_len {
+            Self::update_candidates(&mut candidates, beta_index, pos, SPACE);
+          }
         }
       }
     }
 
     candidates
+  }
+
+  fn update_candidates(
+    candidates: &mut PlaintextCandidates,
+    alpha_index: usize,
+    beta_index: usize,
+    candidate: u8,
+  ) {
+    *candidates
+      .entry((alpha_index, beta_index))
+      .or_default()
+      .entry(candidate)
+      .or_insert(0) += 1
   }
 
   pub fn deduce_plaintexts(
@@ -148,7 +152,7 @@ impl ManyTimePad {
       .collect()
   }
 
-  pub fn get_plaintexts(deductions: PlaintextDeductions) -> Vec<String> {
+  pub fn get_plaintexts(deductions: &PlaintextDeductions) -> Vec<String> {
     let mut plaintexts: Vec<Vec<char>> = vec![];
 
     for ((plaintext_index, character_index), &byte) in deductions.iter() {
@@ -166,6 +170,13 @@ impl ManyTimePad {
     plaintexts
       .into_iter()
       .map(|chars| chars.into_iter().collect())
+      .collect()
+  }
+
+  pub fn derive_plaintexts(ciphers: &[Hex], key: &Hex) -> Vec<String> {
+    ciphers
+      .iter()
+      .map(|cipher| Xor::xor_key(cipher.bytes(), key.bytes()).hex.to_ascii())
       .collect()
   }
 }
@@ -189,10 +200,10 @@ mod tests {
 
   #[test]
   fn test_xor_all_combinations_basic() {
-    let ciphertexts = vec![
-      vec![0x4c, 0xa0, 0x0f, 0xf4],
-      vec![0x5b, 0x1e, 0x39, 0x41],
-      vec![0x6a, 0xd3, 0xf3, 0xbc],
+    let ciphertexts: Vec<Hex> = vec![
+      vec![0x4c, 0xa0, 0x0f, 0xf4].into(),
+      vec![0x5b, 0x1e, 0x39, 0x41].into(),
+      vec![0x6a, 0xd3, 0xf3, 0xbc].into(),
     ];
     let results = ManyTimePad::xor_all_combinations(&ciphertexts);
     let expected_1_2 = vec![0x17, 0xbe, 0x36, 0xb5];
@@ -206,46 +217,50 @@ mod tests {
   #[test]
   fn test_map_plaintext_candidates_valid() {
     let key = Hex::from("f g h");
-    let plains = vec!["a b c", " d e ", "efghya"];
+    let plains = vec!["a b c", " d e ", "efghy"];
     let hexs: Vec<Hex> = plains.clone().into_iter().map(Hex::from).collect();
 
-    let ciphers: Vec<Vec<u8>> = hexs
+    let ciphers: Vec<Hex> = hexs
       .into_iter()
-      .map(|hex| Xor::xor_key(hex.bytes(), key.bytes()))
-      .map(|cipher| cipher.bytes().to_vec())
+      .map(|hex| Xor::xor_key(hex.bytes(), key.bytes()).hex)
       .collect();
 
     let combinations = ManyTimePad::xor_all_combinations(&ciphers);
-
-    println!("{combinations:#?}");
-
     let candidates = ManyTimePad::candidates(&combinations, &ciphers);
-
-    println!("{candidates:#?}");
-
     let deductions = ManyTimePad::deduce_plaintexts(candidates);
-    let derived_plaintexts = ManyTimePad::get_plaintexts(deductions);
+    let plaintexts = ManyTimePad::get_plaintexts(&deductions);
 
-    assert_eq!(plains, derived_plaintexts);
+    assert_eq!(plains, plaintexts);
   }
 
-  // #[test]
-  // fn test_mtp_decrypt() -> std::io::Result<()> {
-  //   let assets = "src/many_time_pad/assets";
-  //   let path = std::env::var("CARGO_MANIFEST_DIR")
-  //     .map(|dir| std::path::PathBuf::from(dir).join(assets))
-  //     .unwrap_or_else(|_| {
-  //       std::env::current_dir()
-  //         .expect("Failed to get current directory")
-  //         .join("crates/cli")
-  //         .join(assets)
-  //     });
-  //
-  //   let input_path = path.join("input.txt");
-  //   let output_path = path.join("output.txt");
-  //   let mut input_file = std::fs::File::open(&input_path)?;
-  //   let mut output_buffer = Vec::new();
-  //
-  //   Ok(())
-  // }
+  #[test]
+  fn test_mtp_decrypt() -> std::io::Result<()> {
+    let assets = "src/many_time_pad/assets";
+    let path = std::env::var("CARGO_MANIFEST_DIR")
+      .map(|dir| std::path::PathBuf::from(dir).join(assets))
+      .unwrap_or_else(|_| {
+        std::env::current_dir()
+          .expect("Failed to get current directory")
+          .join("crates/cli")
+          .join(assets)
+      });
+
+    let input_path = path.join("ciphertext.txt");
+    let output_path = path.join("plaintext.txt");
+
+    let mut input_file = std::fs::File::open(&input_path)?;
+    let mut output_file = std::fs::File::open(&output_path)?;
+    let mut output_buffer = Vec::new();
+
+    ManyTimePad::decrypt(&mut input_file, &mut output_buffer)?;
+
+    let result = String::from_utf8(output_buffer).unwrap();
+    let mut expected = String::new();
+
+    output_file.read_to_string(&mut expected)?;
+
+    assert_eq!(result, expected);
+
+    Ok(())
+  }
 }
