@@ -217,33 +217,38 @@ impl Vigenere {
     let content = Arc::new(content);
     let best_result = Arc::new(Mutex::new((String::new(), f32::MAX)));
 
-    (2..=max_key_length).into_par_iter().for_each(|key_length| {
-      let mut shifts = vec![0u8; key_length as usize];
-      let mut input = Command::get_readable(&content);
-      let caesars = Self::caesar_segments(&mut input, key_length).unwrap();
+    (2..=max_key_length)
+      .into_par_iter()
+      .for_each(|key_length| {
+        let mut shifts = vec![0u8; key_length as usize];
+        let mut input = Command::get_readable(&content);
+        let caesars = Self::caesar_segments(&mut input, key_length).unwrap();
 
-      caesars.into_iter().enumerate().for_each(|(index, caesar)| {
-        let mut buf = Command::get_readable(&caesar);
-        let (_, s) = Caesar::find_best_shift(&mut buf).unwrap();
-        shifts[index] = s;
-      });
+        caesars
+          .into_iter()
+          .enumerate()
+          .for_each(|(index, caesar)| {
+            let mut buf = Command::get_readable(&caesar);
+            let (_, s) = Caesar::find_best_shift(&mut buf).unwrap();
+            shifts[index] = s;
+          });
 
-      let key = Self::derive_key(shifts);
-      let mut buf = Vec::new();
-      let mut input = Command::get_readable(&content);
-      Self::decrypt_with_key(&mut input, &mut buf, &key).unwrap();
-      let candidate = String::from_utf8(buf).unwrap();
-      let mut input = Command::get_readable(&candidate);
+        let key = Self::derive_key(shifts);
+        let mut buf = Vec::new();
+        let mut input = Command::get_readable(&content);
+        Self::decrypt_with_key(&mut input, &mut buf, &key).unwrap();
+        let candidate = String::from_utf8(buf).unwrap();
+        let mut input = Command::get_readable(&candidate);
 
-      if let Ok(score) = FrequencyAnalyzer::score_text(&mut input) {
-        let local_best_result = (candidate.clone(), score);
+        if let Ok(score) = FrequencyAnalyzer::score_text(&mut input) {
+          let local_best_result = (candidate.clone(), score);
 
-        let mut best_result = best_result.lock().unwrap();
-        if local_best_result.1 < best_result.1 {
-          *best_result = local_best_result;
+          let mut best_result = best_result.lock().unwrap();
+          if local_best_result.1 < best_result.1 {
+            *best_result = local_best_result;
+          }
         }
-      }
-    });
+      });
 
     let plaintext = best_result.lock().unwrap().0.clone();
     write!(output, "{plaintext}")?;
@@ -271,7 +276,10 @@ impl Vigenere {
   }
 
   fn derive_key(shifts: Vec<u8>) -> String {
-    shifts.iter().map(|&shift| (b'A' + shift) as char).collect()
+    shifts
+      .iter()
+      .map(|&shift| (b'A' + shift) as char)
+      .collect()
   }
 }
 

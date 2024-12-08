@@ -44,28 +44,33 @@ impl Caesar {
 
     input.read_to_string(&mut buf)?;
 
-    (0..26).into_par_iter().for_each(|shift| {
-      let copy = buf.clone();
-      let mut cursor = Cursor::new(copy.as_bytes());
-      let candidate = Self::decrypt_cipher(&mut cursor, shift).unwrap();
-      let mut buf = Cursor::new(candidate.as_bytes());
+    (0..26)
+      .into_par_iter()
+      .for_each(|shift| {
+        let copy = buf.clone();
+        let mut cursor = Cursor::new(copy.as_bytes());
+        let candidate = Self::decrypt_cipher(&mut cursor, shift).unwrap();
+        let mut buf = Cursor::new(candidate.as_bytes());
 
-      if let Ok(score) = FrequencyAnalyzer::score_text(&mut buf) {
-        let mut best_score_guard = best_score.lock().unwrap();
-        if score < *best_score_guard {
-          *best_score_guard = score;
-          *best_plaintext.lock().unwrap() = candidate;
-          *best_shift.lock().unwrap() = shift;
+        if let Ok(score) = FrequencyAnalyzer::score_text(&mut buf) {
+          let mut best_score_guard = best_score.lock().unwrap();
+          if score < *best_score_guard {
+            *best_score_guard = score;
+            *best_plaintext.lock().unwrap() = candidate;
+            *best_shift.lock().unwrap() = shift;
+          }
         }
-      }
-    });
+      });
 
     let plaintext = Arc::try_unwrap(best_plaintext)
       .unwrap()
       .into_inner()
       .unwrap();
 
-    let shift = Arc::try_unwrap(best_shift).unwrap().into_inner().unwrap();
+    let shift = Arc::try_unwrap(best_shift)
+      .unwrap()
+      .into_inner()
+      .unwrap();
 
     Ok((plaintext, shift))
   }

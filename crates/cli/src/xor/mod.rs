@@ -113,7 +113,10 @@ impl Xor {
     let max_len = std::cmp::max(alpha.len(), beta.len());
     let alpha = Self::pad_slice(alpha, max_len, pad);
     let beta = Self::pad_slice(beta, max_len, pad);
-    let bytes = alpha.zip(beta).map(|(a, b)| a ^ b).collect::<Vec<u8>>();
+    let bytes = alpha
+      .zip(beta)
+      .map(|(a, b)| a ^ b)
+      .collect::<Vec<u8>>();
     bytes.into()
   }
 

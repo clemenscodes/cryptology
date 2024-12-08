@@ -21,7 +21,9 @@ impl FrequencyAnalyzer {
 
     for c in content.chars() {
       if c.is_ascii_alphabetic() {
-        *frequency.entry(c.to_ascii_uppercase()).or_insert(0) += 1;
+        *frequency
+          .entry(c.to_ascii_uppercase())
+          .or_insert(0) += 1;
         total_count += 1;
       }
     }
@@ -81,7 +83,10 @@ impl Display for FrequencyAnalysis {
     writeln!(f, "| Letter | Occurrences | Percentage |")?;
     writeln!(f, "| ------ | ----------- | ---------- |")?;
 
-    let mut entries = self.frequency.iter().collect::<Vec<(&char, &usize)>>();
+    let mut entries = self
+      .frequency
+      .iter()
+      .collect::<Vec<(&char, &usize)>>();
 
     entries.sort_by(|a, b| b.1.cmp(a.1));
 

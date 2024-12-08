@@ -27,7 +27,10 @@ impl MonoalphabeticSubstition {
 
     sorted_frequencies.sort_by(|a, b| b.1.cmp(a.1));
 
-    for (analyzed, english) in sorted_frequencies.iter().zip(ENGLISH.iter()) {
+    for (analyzed, english) in sorted_frequencies
+      .iter()
+      .zip(ENGLISH.iter())
+    {
       substitution_map.insert(*analyzed.0, *english.0);
     }
 

@@ -60,7 +60,11 @@ impl ManyTimePad {
     let mut results = XorCombination::new();
 
     for (i, alpha) in ciphertexts.iter().enumerate() {
-      for (j, beta) in ciphertexts.iter().enumerate().skip(i + 1) {
+      for (j, beta) in ciphertexts
+        .iter()
+        .enumerate()
+        .skip(i + 1)
+      {
         results.insert((i, j), Xor::xor_key(alpha.bytes(), beta.bytes()));
       }
     }
@@ -135,8 +139,10 @@ impl ManyTimePad {
         sorted_counts.sort_by_key(|&(_, count)| std::cmp::Reverse(count));
 
         if let Some((best_byte, best_count)) = sorted_counts.first() {
-          let next_count =
-            sorted_counts.get(1).map(|&(_, count)| count).unwrap_or(0);
+          let next_count = sorted_counts
+            .get(1)
+            .map(|&(_, count)| count)
+            .unwrap_or(0);
           if *best_byte == SPACE {
             if (*best_count as f64) >= 1.7 * (next_count as f64) {
               return Some(((ciphertext_index, pos), *best_byte));
@@ -185,20 +191,26 @@ impl ManyTimePad {
     for i in 0..max_length {
       let mut possible_key_bytes = std::collections::BTreeMap::new();
 
-      for (ciphertext, plaintext) in ciphertexts.iter().zip(plaintexts.iter()) {
+      for (ciphertext, plaintext) in ciphertexts
+        .iter()
+        .zip(plaintexts.iter())
+      {
         if i < ciphertext.bytes().len() && i < plaintext.len() {
           let ct_byte = ciphertext.bytes()[i];
           let pt_byte = plaintext.as_bytes()[i];
 
           if pt_byte != b' ' {
             let key_byte = ct_byte ^ pt_byte;
-            *possible_key_bytes.entry(key_byte).or_insert(0) += 1;
+            *possible_key_bytes
+              .entry(key_byte)
+              .or_insert(0) += 1;
           }
         }
       }
 
-      if let Some((&key_byte, _)) =
-        possible_key_bytes.iter().max_by_key(|&(_, count)| count)
+      if let Some((&key_byte, _)) = possible_key_bytes
+        .iter()
+        .max_by_key(|&(_, count)| count)
       {
         key[i] = Some(key_byte);
       } else {
@@ -206,13 +218,20 @@ impl ManyTimePad {
       }
     }
 
-    key.into_iter().map(|byte| byte.unwrap_or(0x00)).collect()
+    key
+      .into_iter()
+      .map(|byte| byte.unwrap_or(0x00))
+      .collect()
   }
 
   pub fn derive_plaintexts(ciphers: &[Hex], key: &Hex) -> Vec<String> {
     ciphers
       .iter()
-      .map(|cipher| Xor::xor_key(cipher.bytes(), key.bytes()).hex.to_ascii())
+      .map(|cipher| {
+        Xor::xor_key(cipher.bytes(), key.bytes())
+          .hex
+          .to_ascii()
+      })
       .collect()
   }
 
@@ -280,7 +299,11 @@ mod tests {
   fn test_map_plaintext_candidates_valid() {
     let key = Hex::from("f g h");
     let plains = vec!["a b c", " d e ", "efghy"];
-    let hexs: Vec<Hex> = plains.clone().into_iter().map(Hex::from).collect();
+    let hexs: Vec<Hex> = plains
+      .clone()
+      .into_iter()
+      .map(Hex::from)
+      .collect();
 
     let ciphers: Vec<Hex> = hexs
       .into_iter()
